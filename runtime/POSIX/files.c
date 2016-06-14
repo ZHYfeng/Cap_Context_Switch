@@ -1,90 +1,34 @@
-//===-- misc.c ------------------------------------------------------------===//
-//
-//                     The KLEE Symbolic Virtual Machine
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-
-#include <assert.h>
-#include <unistd.h>
-#include <sys/syscall.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <klee/klee.h>
-#include <string.h>
-
-#if 0
-#define MAX_SYM_ENV_SIZE 32
-typedef struct {
-  char name[MAX_SYM_ENV_SIZE];
-  char *value;
-} sym_env_var;
-
-static sym_env_var *__klee_sym_env = 0;
-static unsigned __klee_sym_env_count = 0;
-static unsigned __klee_sym_env_nvars = 0;
-static unsigned __klee_sym_env_var_size = 0;
-void __klee_init_environ(unsigned nvars, 
-                         unsigned var_size) {
-  assert(var_size);
-  __klee_sym_env = malloc(sizeof(*__klee_sym_env) * nvars);
-  assert(__klee_sym_env);
-
-  __klee_sym_env_nvars = nvars;
-  __klee_sym_env_var_size = var_size;  
-}
-
-static size_t __strlen(const char *s) {
-  const char *s2 = s;
-  while (*s2) ++s2;
-  return s2-s;
-}
-
-extern char *__getenv(const char *name);
-char *getenv(const char *name) {
-  char *res = __getenv(name);
-
-  if (!__klee_sym_env_nvars)
-    return res;
-
-  /* If it exists in the system environment fork and return the actual
-     result or 0. */
-  if (res) {
-    return klee_range(0, 2, name) ? res : 0;
-  } else {
-    size_t i, len = __strlen(name);
-
-    if (len>=MAX_SYM_ENV_SIZE) {
-      /* Don't deal with strings to large to fit in our name. */
-      return 0;
-    } else {
-      /* Check for existing entry */
-      for (i=0; i<__klee_sym_env_count; ++i)
-        if (memcmp(__klee_sym_env[i].name, name, len+1)==0)
-          return __klee_sym_env[i].value;
-      
-      /* Otherwise create if room and we choose to */
-      if (__klee_sym_env_count < __klee_sym_env_nvars) {
-        if (klee_range(0, 2, name)) {
-          char *s = malloc(__klee_sym_env_var_size+1);
-          klee_make_symbolic(s, __klee_sym_env_var_size+1. "env");
-          s[__klee_sym_env_var_size] = '\0';
-          
-          memcpy(__klee_sym_env[__klee_sym_env_count].name, name, len+1);
-          __klee_sym_env[__klee_sym_env_count].value = s;
-          ++__klee_sym_env_count;
-          
-          return s;
-        }
-      }
-      
-      return 0;
-    }
-  }
-}
-#endif
+/*
+ * Cloud9 Parallel Symbolic Execution Engine
+ *
+ * Copyright (c) 2011, Dependable Systems Laboratory, EPFL
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of the Dependable Systems Laboratory, EPFL nor the
+ *       names of its contributors may be used to endorse or promote products
+ *       derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE DEPENDABLE SYSTEMS LABORATORY, EPFL BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * All contributors are listed in CLOUD9-AUTHORS file.
+ *
+ */
 
 #include "files.h"
 
@@ -942,6 +886,3 @@ DEFINE_MODEL(int, truncate, const char *pathname, off_t length) {
 DEFINE_MODEL(int, access, const char *pathname, int mode) {
   _WRAP_FILE_SYSCALL_IGNORE(access, mode);
 }
-
-
-
