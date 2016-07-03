@@ -3603,6 +3603,175 @@ Expr::Width Executor::getWidthForLLVMType(LLVM_TYPE_Q llvm::Type *type) const {
   return kmodule->targetData->getTypeSizeInBits(type);
 }
 
+
+/**
+ * 获取address对应的ObjectPair
+ */
+bool Executor::getMemoryObject(ObjectPair& op, ExecutionState& state,
+		ref<Expr> address) {
+	TimingSolver* solver = getTimeSolver();
+	bool success;
+	if (!state.currentStack->addressSpace->resolveOne(state, solver, address, op, success)) {
+		address = toConstant(state, address, "resolveOne failure");
+		success = state.currentStack->addressSpace->resolveOne(cast<ConstantExpr>(address),
+				op);
+	}
+	return success;
+}
+
+bool Executor::isGlobalMO(const MemoryObject* mo) {
+	bool result;
+	if (mo->isGlobal) {
+		result = true;
+	} else {
+		if (mo->isLocal) {
+			result = false;
+		} else {
+			result = true;
+		}
+	}
+	return result;
+}
+
+bool Executor::isFunctionSpecial(Function* f) {
+	if (specialFunctionHandler->handlers.find(f)
+			== specialFunctionHandler->handlers.end()) {
+		return false;
+	} else {
+		return true;
+	}
+}
+
+void Executor::runVerification(llvm::Function *f, int argc, char **argv,
+		char **envp) {
+	while (!isFinished && execStatus != RUNTIMEERROR) {
+		execStatus = SUCCESS;
+		listenerService->startControl(this);
+		runFunctionAsMain(f, argc, argv, envp);
+		listenerService->endControl(this);
+		prepareNextExecution();
+	}
+}
+
+
+void Executor::prepareNextExecution() {
+
+}
+
+void Executor::getNewPrefix() {
+	//获取新的前缀
+	Prefix* prefix = listenerService->getRuntimeDataManager()->getNextPrefix();
+	//Prefix* prefix = NULL;
+	if (prefix) {
+		delete this->prefix;
+		this->prefix = prefix;
+		isFinished = false;
+	} else {
+		isFinished = true;
+#if PRINT_RUNTIMEINFO
+		printPrefix();
+#endif
+	}
+}
+
+/**
+ * 打印函数，用于打印执行的指令
+ */
+void Executor::printInstrcution(ExecutionState &state, KInstruction* ki) {
+	string fileName = "trace"
+			+ Transfer::uint64toString(listenerService->getRuntimeDataManager()->getCurrentTrace()->Id)
+			+ ".txt";
+	string errorMsg;
+	raw_fd_ostream out(fileName.c_str(), errorMsg, raw_fd_ostream::F_Append);
+	//ostream& out = cerr;
+	if (prefix && !isPrefixFinished && prefix->isFinished()) {
+		isPrefixFinished = true;
+		out << "prefix finished\n";
+	}
+	Instruction* inst = ki->inst;
+	if (MDNode *mdNode = inst->getMetadata("dbg")) { // Here I is an LLVM instruction
+		DILocation loc(mdNode); // DILocation is in DebugInfo.h
+		unsigned line = loc.getLineNumber();
+		string file = loc.getFilename().str();
+		string dir = loc.getDirectory().str();
+		out << "thread" << state.currentThread->threadId << " " << dir << "/"
+				<< file << " " << line << ": ";
+		inst->print(out);
+		//cerr << "thread" << state.currentThread->threadId << " " << dir << "/" << file << " " << line << ": " << inst->getOpcodeName() << endl;
+		switch (inst->getOpcode()) {
+		case Instruction::Call: {
+			CallSite cs(inst);
+			Value *fp = cs.getCalledValue();
+			Function *f = getTargetFunction(fp, state);
+			if (!f) {
+				ref<Expr> expr = eval(ki, 0, state.currentStack).value;
+				ConstantExpr* constExpr = dyn_cast<ConstantExpr>(expr.get());
+				uint64_t functionPtr = constExpr->getZExtValue();
+				f = (Function*) functionPtr;
+			}
+			out << " " << f->getName().str();
+			if (f->getName().str() == "pthread_mutex_lock") {
+				ref<Expr> param = eval(ki, 1, state.currentStack).value;
+				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(param);
+				out << " " << cexpr->getZExtValue();
+			} else if (f->getName().str() == "pthread_mutex_unlock") {
+				ref<Expr> param = eval(ki, 1, state.currentStack).value;
+				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(param);
+				out << " " << cexpr->getZExtValue();
+			} else if (f->getName().str() == "pthread_cond_wait") {
+				//get lock
+				ref<Expr> param = eval(ki, 2, state.currentStack).value;
+				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(param);
+				out << " " << cexpr->getZExtValue();
+				//get cond
+				param = eval(ki, 1, state.currentStack).value;
+				cexpr = dyn_cast<ConstantExpr>(param);
+				out << " " << cexpr->getZExtValue();
+			} else if (f->getName().str() == "pthread_cond_signal") {
+				ref<Expr> param = eval(ki, 1, state.currentStack).value;
+				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(param);
+				out << " " << cexpr->getZExtValue();
+			} else if (f->getName().str() == "pthread_cond_broadcast") {
+				ref<Expr> param = eval(ki, 1, state.currentStack).value;
+				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(param);
+				out << " " << cexpr->getZExtValue();
+			}
+			break;
+		}
+
+		}
+		out << '\n';
+	} else {
+		out << "thread" << state.currentThread->threadId << " klee/internal 0: "
+				<< inst->getOpcodeName() << '\n';
+	}
+
+	out.close();
+	if (prefix && prefix->current() + 1 == prefix->end()) {
+		inst->print(errs());
+		Event* event = *prefix->current();
+		ref<Expr> param = eval(ki, 0, state.currentStack).value;
+		ConstantExpr* condition = dyn_cast<ConstantExpr>(param);
+		if (condition->getAPValue().getBoolValue() != event->brCondition) {
+			cerr << "\n前缀已被取反\n";
+		} else {
+			cerr << "\n前缀未被取反\n";
+		}
+	}
+}
+
+void Executor::printPrefix() {
+	if (prefix) {
+		string fileName = prefix->getName() + ".txt";
+		string errorMsg;
+		raw_fd_ostream out(fileName.c_str(), errorMsg,
+				raw_fd_ostream::F_Append);
+		prefix->print(out);
+		out.close();
+		//prefix->print(cerr);
+	}
+}
+
 ///
 
 Interpreter *Interpreter::create(const InterpreterOptions &opts,

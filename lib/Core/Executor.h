@@ -88,6 +88,12 @@ class Executor : public Interpreter {
   friend class WeightedRandomSearcher;
   friend class SpecialFunctionHandler;
   friend class StatsTracker;
+	friend class ListenerService;
+	friend class PSOListener;
+	friend class SymbolicListener;
+	friend class TaintListener;
+	friend class TestListener;
+	friend class CondManager;
 
 public:
   class Timer {
@@ -318,12 +324,12 @@ private:
   Cell& getArgumentCell(ExecutionState &state,
                         KFunction *kf,
                         unsigned index) {
-    return state.stack.back().locals[kf->getArgRegister(index)];
+    return state.currentStack->realStack.back().locals[kf->getArgRegister(index)];
   }
 
   Cell& getDestCell(ExecutionState &state,
                     KInstruction *target) {
-    return state.stack.back().locals[target->dest];
+    return state.currentStack->realStack.back().locals[target->dest];
   }
 
   void bindLocal(KInstruction *target, 
@@ -413,6 +419,42 @@ private:
   void checkMemoryUsage();
   void printDebugInstructions(ExecutionState &state);
 
+	//add by ylc to support pthread
+	unsigned executePThreadCreate(ExecutionState &state, KInstruction *ki,
+			std::vector<ref<Expr> > &arguments);
+
+	unsigned executePThreadJoin(ExecutionState &state, KInstruction *ki,
+			std::vector<ref<Expr> > &arguments);
+
+	unsigned executePThreadCondWait(ExecutionState &state, KInstruction *ki,
+			std::vector<ref<Expr> > &arguments);
+
+	unsigned executePThreadCondSignal(ExecutionState &state, KInstruction *ki,
+			std::vector<ref<Expr> > &arguments);
+
+	unsigned executePThreadCondBroadcast(ExecutionState &state,
+			KInstruction *ki, std::vector<ref<Expr> > &arguments);
+
+	unsigned executePThreadMutexLock(ExecutionState &state, KInstruction *ki,
+			std::vector<ref<Expr> > &arguments);
+
+	unsigned executePThreadMutexUnlock(ExecutionState &state, KInstruction *ki,
+			std::vector<ref<Expr> > &arguments);
+
+	unsigned executePThreadBarrierInit(ExecutionState &state, KInstruction *ki,
+			std::vector<ref<Expr> > &arguments);
+
+	unsigned executePThreadBarrierWait(ExecutionState &state, KInstruction *ki,
+			std::vector<ref<Expr> > &arguments);
+
+	unsigned executePThreadBarrierDestory(ExecutionState &state,
+			KInstruction *ki, std::vector<ref<Expr> > &arguments);
+
+	void handleInitializers(ExecutionState& initialState);
+
+	void createSpecialElement(ExecutionState& state, llvm::Type* type,
+			uint64_t& startAddress, bool isInitializer);
+
 public:
   Executor(const InterpreterOptions &opts, InterpreterHandler *ie);
   virtual ~Executor();
@@ -485,6 +527,27 @@ public:
                                std::map<const std::string*, std::set<unsigned> > &res);
 
   Expr::Width getWidthForLLVMType(LLVM_TYPE_Q llvm::Type *type) const;
+
+	bool getMemoryObject(ObjectPair& op, ExecutionState& state,
+			ref<Expr> address);
+
+	bool isGlobalMO(const MemoryObject* mo);
+
+	TimingSolver* getTimeSolver() {
+		return solver;
+	}
+
+	bool isFunctionSpecial(llvm::Function* f);
+
+	void runVerification(llvm::Function *f, int argc, char **argv, char **envp);
+
+	void prepareNextExecution();
+
+	void getNewPrefix();
+
+	void printInstrcution(ExecutionState &state, KInstruction* ki);
+
+	void printPrefix();
 };
   
 } // End klee namespace
