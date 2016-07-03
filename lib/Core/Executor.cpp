@@ -1094,8 +1094,8 @@ Executor::toConstant(ExecutionState &state,
   std::string str;
   llvm::raw_string_ostream os(str);
   os << "silently concretizing (reason: " << reason << ") expression " << e
-     << " to value " << value << " (" << (*(state.pc)).info->file << ":"
-     << (*(state.pc)).info->line << ")";
+     << " to value " << value << " (" << (*(state.currentThread->pc)).info->file << ":"
+     << (*(state.currentThread->pc)).info->line << ")";
 
   if (AllExternalWarnings)
     klee_warning(reason, os.str().c_str());
@@ -1165,13 +1165,13 @@ void Executor::printDebugInstructions(ExecutionState &state) {
 
   if (!optionIsSet(DebugPrintInstructions, STDERR_COMPACT) &&
       !optionIsSet(DebugPrintInstructions, FILE_COMPACT))
-    printFileLine(state, state.pc, *stream);
+    printFileLine(state, state.currentThread->pc, *stream);
 
-  (*stream) << state.pc->info->id;
+  (*stream) << state.currentThread->pc->info->id;
 
   if (optionIsSet(DebugPrintInstructions, STDERR_ALL) ||
       optionIsSet(DebugPrintInstructions, FILE_ALL))
-    (*stream) << ":" << *(state.pc->inst);
+    (*stream) << ":" << *(state.currentThread->pc->inst);
   (*stream) << "\n";
 
   if (optionIsSet(DebugPrintInstructions, FILE_ALL) ||
@@ -1189,8 +1189,8 @@ void Executor::stepInstruction(ExecutionState &state) {
     statsTracker->stepInstruction(state);
 
   ++stats::instructions;
-  state.prevPC = state.pc;
-  ++state.pc;
+  state.prevPC = state.currentThread->pc;
+  ++state.currentThread->pc;
 
   if (stats::instructions==StopAfterNInstructions)
     haltExecution = true;
@@ -1269,7 +1269,7 @@ void Executor::executeCall(ExecutionState &state,
     // from just an instruction (unlike LLVM).
     KFunction *kf = kmodule->functionMap[f];
     state.pushFrame(state.prevPC, kf);
-    state.pc = kf->instructions;
+    state.currentThread->pc = kf->instructions;
         
     if (statsTracker)
       statsTracker->framePushed(state, &state.stack[state.stack.size()-2]);
@@ -1373,9 +1373,9 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   // XXX this lookup has to go ?
   KFunction *kf = state.stack.back().kf;
   unsigned entry = kf->basicBlockEntry[dst];
-  state.pc = &kf->instructions[entry];
-  if (state.pc->inst->getOpcode() == Instruction::PHI) {
-    PHINode *first = static_cast<PHINode*>(state.pc->inst);
+  state.currentThread->pc = &kf->instructions[entry];
+  if (state.currentThread->pc->inst->getOpcode() == Instruction::PHI) {
+    PHINode *first = static_cast<PHINode*>(state.currentThread->pc->inst);
     state.incomingBBIndex = first->getBasicBlockIndex(src);
   }
 }
@@ -1468,7 +1468,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       assert(!caller && "caller set on initial stack frame");
       terminateStateOnExit(state);
     } else {
-      state.popFrame();
+      state.currentStack->popFrame();
 
       if (statsTracker)
         statsTracker->framePopped(state);
@@ -1476,8 +1476,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       if (InvokeInst *ii = dyn_cast<InvokeInst>(caller)) {
         transferToBasicBlock(ii->getNormalDest(), caller->getParent(), state);
       } else {
-        state.pc = kcaller;
-        ++state.pc;
+        state.currentThread->pc = kcaller;
+        ++state.currentThread->pc;
       }
 
       if (!isVoidReturn) {
@@ -2586,7 +2586,7 @@ void Executor::run(ExecutionState &initialState) {
       lastState = it->first;
       unsigned numSeeds = it->second.size();
       ExecutionState &state = *lastState;
-      KInstruction *ki = state.pc;
+      KInstruction *ki = state.currentThread->pc;
       stepInstruction(state);
 
       executeInstruction(state, ki);
@@ -2636,7 +2636,7 @@ void Executor::run(ExecutionState &initialState) {
 
   while (!states.empty() && !haltExecution) {
     ExecutionState &state = searcher->selectState();
-    KInstruction *ki = state.pc;
+    KInstruction *ki = state.currentThread->pc;
     stepInstruction(state);
 
     executeInstruction(state, ki);
@@ -2724,7 +2724,7 @@ void Executor::terminateState(ExecutionState &state) {
 
   std::set<ExecutionState*>::iterator it = addedStates.find(&state);
   if (it==addedStates.end()) {
-    state.pc = state.prevPC;
+    state.currentThread->pc = state.prevPC;
 
     removedStates.insert(&state);
   } else {
@@ -2825,7 +2825,7 @@ void Executor::terminateStateOnError(ExecutionState &state,
       msg << "assembly.ll line: " << ii.assemblyLine << "\n";
     }
     msg << "Stack: \n";
-    state.dumpStack(msg);
+    state.currentThread->dumpStack(msg);
 
     std::string info_str = info.str();
     if (info_str != "")
@@ -3196,7 +3196,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
                                       inBounds);
     solver->setTimeout(0);
     if (!success) {
-      state.pc = state.prevPC;
+      state.currentThread->pc = state.prevPC;
       terminateStateEarly(state, "Query timed out (bounds check).");
       return;
     }

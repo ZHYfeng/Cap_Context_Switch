@@ -40,19 +40,25 @@ namespace {
   DebugLogStateMerge("debug-log-state-merge");
 }
 
-ExecutionState::ExecutionState(KFunction *kf) :
-    pc(kf->instructions),
-    prevPC(pc),
-
-    queryCost(0.), 
-    weight(1),
-    depth(0),
-
-    instsSinceCovNew(0),
-    coveredNew(false),
-    forkDisabled(false),
+ExecutionState::ExecutionState(KFunction *kf)
+  : depth(0),
+	queryCost(0.),
+	weight(1),
+	instsSinceCovNew(0),
+	coveredNew(false),
+	forkDisabled(false),
+	nextThreadId(1),
+	mutexManager(),
+	condManager(),
     ptreeNode(0) {
-  pushFrame(0, kf);
+
+	condManager.setMutexManager(&mutexManager);
+	threadScheduler = getThreadSchedulerByType(ThreadScheduler::FIFS);
+	Thread* thread = new Thread(getNextThreadId(), NULL, kf);
+	threadList.addThread(thread);
+	threadScheduler->addItem(thread);
+	currentThread = thread;
+	currentStack->pushFrame(0, kf);
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
@@ -67,37 +73,40 @@ ExecutionState::~ExecutionState() {
     if (mo->refCount == 0)
       delete mo;
   }
-
-  while (!stack.empty()) popFrame();
+  for (ThreadList::iterator ti = threadList.begin(), te = threadList.end(); ti != te; ti++) {
+	  delete *ti;
+  }
+  delete threadScheduler;
+//  while (!stack.empty()) popFrame();
 }
 
-ExecutionState::ExecutionState(const ExecutionState& state):
-    fnAliases(state.fnAliases),
-    pc(state.pc),
-    prevPC(state.prevPC),
-    stack(state.stack),
-    incomingBBIndex(state.incomingBBIndex),
-
-    addressSpace(state.addressSpace),
+ExecutionState::ExecutionState(const ExecutionState& state)
+  : fnAliases(state.fnAliases),
+    depth(state.depth),
     constraints(state.constraints),
-
     queryCost(state.queryCost),
     weight(state.weight),
-    depth(state.depth),
-
+    addressSpace(state.addressSpace),
     pathOS(state.pathOS),
     symPathOS(state.symPathOS),
-
     instsSinceCovNew(state.instsSinceCovNew),
     coveredNew(state.coveredNew),
     forkDisabled(state.forkDisabled),
     coveredLines(state.coveredLines),
-    ptreeNode(state.ptreeNode),
     symbolics(state.symbolics),
     arrayNames(state.arrayNames)
 {
   for (unsigned int i=0; i<symbolics.size(); i++)
     symbolics[i].first->refCount++;
+
+  for (ThreadList::iterator ti = state.threadList.begin(), te = state.threadList.end(); ti != te; ti++) {
+	  Thread* thread = new Thread(**ti);
+	  threadList.addThread(thread);
+  }
+  currentThread = findThreadById(state.currentThread->threadId);
+  std::map<unsigned, Thread*> unfinishedThread = threadList.getAllUnfinishedThreads();
+  threadScheduler = new FIFSThreadScheduler(*(FIFSThreadScheduler*)(state.threadScheduler), unfinishedThread);
+//  threadScheduler = new PreemptiveThreadScheduler(*(PreemptiveThreadScheduler*)(state.threadScheduler), unfinishedThread);
 }
 
 ExecutionState *ExecutionState::branch() {
@@ -111,18 +120,6 @@ ExecutionState *ExecutionState::branch() {
   falseState->weight -= weight;
 
   return falseState;
-}
-
-void ExecutionState::pushFrame(KInstIterator caller, KFunction *kf) {
-  stack.push_back(StackFrame(caller,kf));
-}
-
-void ExecutionState::popFrame() {
-  StackFrame &sf = stack.back();
-  for (std::vector<const MemoryObject*>::iterator it = sf.allocas.begin(), 
-         ie = sf.allocas.end(); it != ie; ++it)
-    addressSpace.unbindObject(*it);
-  stack.pop_back();
 }
 
 void ExecutionState::addSymbolic(const MemoryObject *mo, const Array *array) { 
@@ -165,7 +162,7 @@ bool ExecutionState::merge(const ExecutionState &b) {
   if (DebugLogStateMerge)
     llvm::errs() << "-- attempting merge of A:" << this << " with B:" << &b
                  << "--\n";
-  if (pc != b.pc)
+  if (currentThread->pc != b.currentThread->pc)
     return false;
 
   // XXX is it even possible for these to differ? does it matter? probably
@@ -174,16 +171,16 @@ bool ExecutionState::merge(const ExecutionState &b) {
     return false;
 
   {
-    std::vector<StackFrame>::const_iterator itA = stack.begin();
-    std::vector<StackFrame>::const_iterator itB = b.stack.begin();
-    while (itA!=stack.end() && itB!=b.stack.end()) {
+    std::vector<StackFrame>::const_iterator itA = currentStack->realStack.begin();
+    std::vector<StackFrame>::const_iterator itB = b.currentStack->realStack.begin();
+    while (itA!=currentStack->realStack.end() && itB!=b.currentStack->realStack.end()) {
       // XXX vaargs?
       if (itA->caller!=itB->caller || itA->kf!=itB->kf)
         return false;
       ++itA;
       ++itB;
     }
-    if (itA!=stack.end() || itB!=b.stack.end())
+    if (itA!=currentStack->realStack.end() || itB!=b.currentStack->realStack.end())
       return false;
   }
 
@@ -279,9 +276,9 @@ bool ExecutionState::merge(const ExecutionState &b) {
   // it seems like it can make a difference, even though logically
   // they must contradict each other and so inA => !inB
 
-  std::vector<StackFrame>::iterator itA = stack.begin();
-  std::vector<StackFrame>::const_iterator itB = b.stack.begin();
-  for (; itA!=stack.end(); ++itA, ++itB) {
+  std::vector<StackFrame>::iterator itA = currentStack->realStack.begin();
+  std::vector<StackFrame>::const_iterator itB = b.currentStack->realStack.begin();
+  for (; itA!=currentStack->realStack.end(); ++itA, ++itB) {
     StackFrame &af = *itA;
     const StackFrame &bf = *itB;
     for (unsigned i=0; i<af.kf->numRegisters; i++) {
@@ -322,36 +319,132 @@ bool ExecutionState::merge(const ExecutionState &b) {
   return true;
 }
 
-void ExecutionState::dumpStack(llvm::raw_ostream &out) const {
-  unsigned idx = 0;
-  const KInstruction *target = prevPC;
-  for (ExecutionState::stack_ty::const_reverse_iterator
-         it = stack.rbegin(), ie = stack.rend();
-       it != ie; ++it) {
-    const StackFrame &sf = *it;
-    Function *f = sf.kf->function;
-    const InstructionInfo &ii = *target->info;
-    out << "\t#" << idx++;
-    std::stringstream AssStream;
-    AssStream << std::setw(8) << std::setfill('0') << ii.assemblyLine;
-    out << AssStream.str();
-    out << " in " << f->getName().str() << " (";
-    // Yawn, we could go up and print varargs if we wanted to.
-    unsigned index = 0;
-    for (Function::arg_iterator ai = f->arg_begin(), ae = f->arg_end();
-         ai != ae; ++ai) {
-      if (ai!=f->arg_begin()) out << ", ";
+Thread* ExecutionState::findThreadById(unsigned threadId) {
+	return threadList.findThreadById(threadId);
+}
 
-      out << ai->getName().str();
-      // XXX should go through function
-      ref<Expr> value = sf.locals[sf.kf->getArgRegister(index++)].value; 
-      if (isa<ConstantExpr>(value))
-        out << "=" << value;
-    }
-    out << ")";
-    if (ii.file != "")
-      out << " at " << ii.file << ":" << ii.line;
-    out << "\n";
-    target = sf.caller;
-  }
+Thread* ExecutionState::getCurrentThread() {
+	if (!threadScheduler->isSchedulerEmpty()) {
+		currentThread = threadScheduler->selectCurrentItem();
+	} else {
+		currentThread = NULL;
+	}
+	return currentThread;
+}
+
+Thread* ExecutionState::getNextThread() {
+	Thread* nextThread;
+	if (!threadScheduler->isSchedulerEmpty()) {
+		nextThread = threadScheduler->selectNextItem();
+	} else {
+		nextThread = NULL;
+	}
+	currentThread = nextThread;
+	return nextThread;
+}
+
+bool ExecutionState::examineAllThreadFinalState() {
+	bool isAllThreadFinished = true;
+	for (ThreadList::iterator ti = threadList.begin(), te = threadList.end(); ti != te; ti++) {
+		Thread* thread = *ti;
+		unsigned line;
+		std::string file, dir;
+		if (!thread->isTerminated()) {
+			isAllThreadFinished = false;
+			Instruction* inst = thread->prevPC->inst;
+			std::cerr << "thread " << thread->threadId << " unable to finish successfully, final state is " << thread->threadState << std::endl;
+			std::cerr << "function = " << inst->getParent()->getParent()->getName().str() << std::endl;
+			if (MDNode *mdNode = inst->getMetadata("dbg")) {
+				DILocation loc(mdNode);                  // DILocation is in DebugInfo.h
+				line = loc.getLineNumber();
+				file = loc.getFilename().str();
+				dir = loc.getDirectory().str();
+				std::cerr << "pos = " << dir << "/" << file << " : " << line << " " << inst->getOpcodeName() << std::endl;
+			}
+			std::cerr << std::endl;
+		}
+	}
+	threadScheduler->printAllItem(std::cerr);
+	return isAllThreadFinished;
+}
+
+unsigned ExecutionState::getNextThreadId() {
+	unsigned threadId = nextThreadId++;
+	assert (nextThreadId <= 6 && "vector clock 只有5个");
+	return threadId;
+}
+
+Thread* ExecutionState::createThread(KFunction *kf) {
+	Thread* newThread = new Thread(getNextThreadId(), currentThread, kf);
+	threadList.addThread(newThread);
+	threadScheduler->addItem(newThread);
+	return newThread;
+}
+
+Thread* ExecutionState::createThread(KFunction *kf, unsigned threadId) {
+	if (threadId >= nextThreadId) {
+		nextThreadId = threadId + 1;
+		assert (nextThreadId <= 6 && "vector clock 只有5个");
+	}
+	Thread* newThread = new Thread(threadId, currentThread, kf);
+	threadList.addThread(newThread);
+	threadScheduler->addItem(newThread);
+	return newThread;
+
+}
+
+void ExecutionState::swapOutThread(Thread* thread, bool isCondBlocked, bool isBarrierBlocked, bool isJoinBlocked, bool isTerminated) {
+	threadScheduler->removeItem(thread);
+	if (isCondBlocked) {
+		thread->threadState = Thread::COND_BLOCKED;
+	}
+	if (isBarrierBlocked) {
+		thread->threadState = Thread::BARRIER_BLOCKED;
+	}
+	if (isJoinBlocked) {
+		thread->threadState = Thread::JOIN_BLOCKED;
+	}
+	if (isTerminated) {
+		thread->threadState = Thread::TERMINATED;
+	}
+}
+
+void ExecutionState::swapInThread(Thread* thread, bool isRunnable, bool isMutexBlocked) {
+	threadScheduler->addItem(thread);
+	if (isRunnable) {
+		thread->threadState = Thread::RUNNABLE;
+	}
+	if (isMutexBlocked) {
+		thread->threadState = Thread::MUTEX_BLOCKED;
+	}
+}
+
+void ExecutionState::switchThreadToMutexBlocked(Thread* thread) {
+	assert(thread->isRunnable());
+	thread->threadState = Thread::MUTEX_BLOCKED;
+}
+
+void ExecutionState::switchThreadToRunnable(Thread* thread) {
+	assert(thread->isMutexBlocked());
+	thread->threadState = Thread::RUNNABLE;
+}
+
+void ExecutionState::swapOutThread(unsigned threadId, bool isCondBlocked, bool isBarrierBlocked, bool isJoinBlocked, bool isTerminated) {
+	swapOutThread(findThreadById(threadId), isCondBlocked, isBarrierBlocked, isJoinBlocked, isTerminated);
+}
+
+void ExecutionState::swapInThread(unsigned threadId, bool isRunnable, bool isMutexBlocked) {
+	swapInThread(findThreadById(threadId), isRunnable, isMutexBlocked);
+}
+
+void ExecutionState::switchThreadToMutexBlocked(unsigned threadId) {
+	switchThreadToMutexBlocked(findThreadById(threadId));
+}
+
+void ExecutionState::switchThreadToRunnable(unsigned threadId) {
+	switchThreadToRunnable(findThreadById(threadId));
+}
+
+void ExecutionState::reSchedule() {
+	threadScheduler->reSchedule();
 }

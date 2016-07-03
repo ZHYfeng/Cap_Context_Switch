@@ -68,6 +68,8 @@ public:
 	bool isSchedulable() {
 		return isRunnable() || isMutexBlocked();
 	}
+
+	void dumpStack(llvm::raw_ostream &out) const;
 };
 
 } /* namespace klee */

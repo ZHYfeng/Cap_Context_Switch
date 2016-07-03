@@ -27,7 +27,7 @@ public:
 
 	void pushFrame(KInstIterator caller, KFunction *kf);
 	void popFrame();
-	void dumpStack(std::ostream &out, KInstruction *prevPC) const;
+	void dumpStack(llvm::raw_ostream &out, KInstIterator prevPC) const;
 
 public:
 	std::vector<StackFrame> realStack;

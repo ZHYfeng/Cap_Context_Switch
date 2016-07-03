@@ -48,5 +48,8 @@ Thread::~Thread() {
 	stack.~StackType();
 }
 
+void Thread::dumpStack(llvm::raw_ostream &out) const {
+	stack.dumpStack(out, prevPC);
+}
 
 } /* namespace klee */

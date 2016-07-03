@@ -43,7 +43,7 @@ void StackType::popFrame() {
 	realStack.pop_back();
 }
 
-void StackType::dumpStack(std::ostream &out, KInstruction *prevPC) const {
+void StackType::dumpStack(llvm::raw_ostream &out, KInstIterator prevPC) const {
 	unsigned idx = 0;
 	const KInstruction *target = prevPC;
 	for (std::vector<StackFrame>::const_reverse_iterator it =
@@ -51,8 +51,10 @@ void StackType::dumpStack(std::ostream &out, KInstruction *prevPC) const {
 		const StackFrame &sf = *it;
 		llvm::Function *f = sf.kf->function;
 		const InstructionInfo &ii = *target->info;
-		out << "\t#" << idx++ << " " << std::setw(8) << std::setfill('0')
-				<< ii.assemblyLine << " in " << f->getName().str() << " (";
+	    std::stringstream AssStream;
+	    AssStream << std::setw(8) << std::setfill('0') << ii.assemblyLine;
+	    out << AssStream.str();
+	    out << " in " << f->getName().str() << " (";
 		// Yawn, we could go up and print varargs if we wanted to.
 		unsigned index = 0;
 		for (llvm::Function::arg_iterator ai = f->arg_begin(), ae =
