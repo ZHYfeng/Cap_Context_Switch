@@ -12,6 +12,7 @@
 
 #include "../../include/klee/Internal/Module/KInstIterator.h"
 #include "../Core/Memory.h"
+#include "../../include/klee/Internal/Module/Cell.h"
 
 namespace klee {
 class CallPathNode;

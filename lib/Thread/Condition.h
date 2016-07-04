@@ -8,12 +8,11 @@
 #ifndef CONDITION_H_
 #define CONDITION_H_
 
-#include "WaitParam.h"
-#include "CondScheduler.h"
-#include "Prefix.h"
 #include <string>
-#include <map>
 #include <vector>
+
+#include "CondScheduler.h"
+#include "WaitParam.h"
 
 
 namespace klee {

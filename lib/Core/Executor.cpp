@@ -40,6 +40,7 @@
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/ErrorHandling.h>
+#include <llvm/Support/FileSystem.h>
 #include <llvm/Support/MathExtras.h>
 #include <sys/types.h>
 #include <algorithm>
@@ -84,6 +85,7 @@
 #include "CallPathManager.h"
 #include "Context.h"
 #include "CoreStats.h"
+#include "ExecutorTimerInfo.h"
 #include "ExternalDispatcher.h"
 #include "ImpliedValue.h"
 #include "MemoryManager.h"
@@ -289,6 +291,8 @@ namespace klee {
   RNG theRNG;
 }
 
+bool Executor::hasInitialized = false;
+
 Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
     : 	Interpreter(opts),
 		kmodule(0),
@@ -315,8 +319,7 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
 		isFinished(false),
 		prefix(NULL),
 		executionNum(0),
-		execStatus(SUCCESS),
-		hasInitialized(false) {
+		execStatus(SUCCESS) {
 
   if (coreSolverTimeout) UseForkedCoreSolver = true;
   Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse);

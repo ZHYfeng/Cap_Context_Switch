@@ -8,16 +8,16 @@
 #ifndef LIB_CORE_THREADSCHEDULER_H_
 #define LIB_CORE_THREADSCHEDULER_H_
 
-#include <list>
-#include <vector>
-#include <map>
 #include <iostream>
-#include <sys/time.h>
+#include <list>
+#include <map>
+#include <vector>
 
-#include "Event.h"
-#include "klee/Internal/ADT/RNG.h"
 #include "Thread.h"
-#include "Prefix.h"
+
+namespace klee {
+class Prefix;
+} /* namespace klee */
 
 namespace klee {
 

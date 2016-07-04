@@ -26,7 +26,6 @@
 #include "Constraints.h"
 #include "Expr.h"
 #include "Internal/ADT/TreeStream.h"
-#include "Internal/Module/KInstIterator.h"
 #include "util/Ref.h"
 
 namespace klee {

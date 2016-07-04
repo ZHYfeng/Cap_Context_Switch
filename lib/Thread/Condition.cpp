@@ -7,6 +7,8 @@
 
 #include "Condition.h"
 
+#include <iterator>
+
 using namespace::std;
 
 namespace klee {

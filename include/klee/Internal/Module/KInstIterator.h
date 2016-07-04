@@ -10,6 +10,8 @@
 #ifndef KLEE_KINSTITERATOR_H
 #define KLEE_KINSTITERATOR_H
 
+#include "KInstruction.h"
+
 namespace klee {
   struct KInstruction;
 

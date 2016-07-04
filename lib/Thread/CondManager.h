@@ -14,8 +14,10 @@
 #include <vector>
 
 #include "Condition.h"
-#include "MutexManager.h"
-#include "Prefix.h"
+
+namespace klee {
+class MutexManager;
+} /* namespace klee */
 
 namespace klee {
 

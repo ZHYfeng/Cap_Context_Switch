@@ -8,12 +8,15 @@
 #ifndef LIB_CORE_CONDSCHEDULER_H_
 #define LIB_CORE_CONDSCHEDULER_H_
 
-#include "WaitParam.h"
-#include "Prefix.h"
-#include "klee/Internal/ADT/RNG.h"
+#include <iostream>
 #include <list>
 #include <vector>
-#include <iostream>
+
+#include "WaitParam.h"
+
+namespace klee {
+class Prefix;
+} /* namespace klee */
 
 namespace klee {
 

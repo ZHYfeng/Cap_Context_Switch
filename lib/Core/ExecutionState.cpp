@@ -7,16 +7,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "klee/ExecutionState.h"
+#include "../../include/klee/ExecutionState.h"
 
-#include "klee/Internal/Module/Cell.h"
-#include "klee/Internal/Module/InstructionInfoTable.h"
-#include "klee/Internal/Module/KInstruction.h"
-#include "klee/Internal/Module/KModule.h"
+#include <llvm/ADT/StringRef.h>
+#include <llvm/DebugInfo.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Instruction.h>
+#include <algorithm>
+#include <iostream>
+#include <iterator>
 
-#include "klee/Expr.h"
+#include "../../include/klee/Config/Version.h"
+#include "../../include/klee/Internal/ADT/ImmutableMap.h"
+#include "../../include/klee/Internal/ADT/ImmutableTree.h"
+#include "../../include/klee/Internal/Module/KModule.h"
+#include "../Thread/StackType.h"
+#include "../Thread/Thread.h"
+#include "../Thread/ThreadScheduler.h"
+#include "ObjectHolder.h"
 
-#include "Memory.h"
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/Function.h"
 #else

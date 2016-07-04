@@ -19,7 +19,6 @@
 #include <llvm/IR/GlobalValue.h>
 #include <llvm/Support/raw_ostream.h>
 #include <cassert>
-#include <cstdint>
 #include <map>
 #include <set>
 #include <string>
@@ -36,8 +35,8 @@
 #include "../../include/klee/util/ArrayCache.h"
 #include "../../include/klee/util/Ref.h"
 #include "../Thread/StackType.h"
+#include "../Encode/ListenerService.h"
 #include "AddressSpace.h"
-#include "ExecutorTimerInfo.h"
 #include "Memory.h"
 #include "SeedInfo.h"
 
