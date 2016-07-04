@@ -68,6 +68,7 @@ endif
 
 ifneq ($(ENABLE_Z3),0)
   CXX.Flags += $(Z3_CFLAGS)
+  CXX.Flags += -fexceptions
 endif
 
 CXX.Flags += -DKLEE_DIR=\"$(PROJ_OBJ_ROOT)\" -DKLEE_INSTALL_BIN_DIR=\"$(PROJ_bindir)\"
