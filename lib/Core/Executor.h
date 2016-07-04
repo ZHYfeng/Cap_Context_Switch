@@ -15,25 +15,22 @@
 #ifndef KLEE_EXECUTOR_H
 #define KLEE_EXECUTOR_H
 
-#include <llvm/ADT/Twine.h>
-#include <llvm/IR/GlobalValue.h>
-#include <llvm/Support/raw_ostream.h>
-#include <cassert>
+#include "llvm/Support/CallSite.h"
+
+#include <vector>
+#include <string>
 #include <map>
 #include <set>
-#include <string>
-#include <utility>
-#include <vector>
 
-#include "../../include/klee/Config/Version.h"
-#include "../../include/klee/ExecutionState.h"
-#include "../../include/klee/Expr.h"
-#include "../../include/klee/Internal/ADT/KTest.h"
-#include "../../include/klee/Internal/Module/KInstruction.h"
-#include "../../include/klee/Internal/Module/KModule.h"
-#include "../../include/klee/Interpreter.h"
-#include "../../include/klee/util/ArrayCache.h"
-#include "../../include/klee/util/Ref.h"
+#include "klee/ExecutionState.h"
+#include "klee/Interpreter.h"
+#include "klee/Internal/Module/Cell.h"
+#include "klee/Internal/Module/KInstruction.h"
+#include "klee/Internal/Module/KModule.h"
+#include "klee/util/ArrayCache.h"
+
+
+
 #include "../Thread/StackType.h"
 #include "../Encode/ListenerService.h"
 #include "AddressSpace.h"
@@ -87,13 +84,13 @@ namespace klee {
   /// removedStates, and haltExecution, among others.
 
 class Executor : public Interpreter {
-  friend class BumpMergingSearcher;
-  friend class MergingSearcher;
-  friend class RandomPathSearcher;
-  friend class OwningSearcher;
-  friend class WeightedRandomSearcher;
-  friend class SpecialFunctionHandler;
-  friend class StatsTracker;
+	friend class BumpMergingSearcher;
+	friend class MergingSearcher;
+	friend class RandomPathSearcher;
+	friend class OwningSearcher;
+	friend class WeightedRandomSearcher;
+	friend class SpecialFunctionHandler;
+	friend class StatsTracker;
 	friend class ListenerService;
 	friend class PSOListener;
 	friend class SymbolicListener;

@@ -23,11 +23,7 @@
 
 #include "klee/CommandLine.h"
 
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/Module.h"
-#else
-#include "llvm/Module.h"
-#endif
 #include "llvm/ADT/Twine.h"
 
 #include <errno.h>
@@ -131,6 +127,27 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("__ubsan_handle_sub_overflow", handleSubOverflow, false),
   add("__ubsan_handle_mul_overflow", handleMulOverflow, false),
   add("__ubsan_handle_divrem_overflow", handleDivRemOverflow, false),
+
+		//@ylc handle pthread
+		add("pthread_create", handlePThreadCreate, true),
+		add("pthread_exit", handlePThreadExit, true),
+		add("pthread_cancel", handlePThreadCancel, true),
+		add("pthread_join", handlePThreadJoin, true),
+		add("pthread_testcancel", handlePThreadTestCancel, false),
+//		add("pthread_mutex_init", handlePThreadMutexInit, true), //KLEE自带了External机制
+		add("pthread_mutex_lock", handlePThreadMutexLock, true),
+		add("pthread_mutex_unlock", handlePThreadMutexUnlock, true),
+//		add("pthread_cond_init", handlePThreadCondInit, true),
+		add("pthread_cond_wait", handlePThreadCondWait, true),
+		add("pthread_cond_signal", handlePThreadCondSignal, true),
+		add("pthread_cond_broadcast", handlePThreadCondBroadcast, true),
+		add("pthread_barrier_init", handlePThreadBarrierInit, true),
+		add("pthread_barrier_wait", handlePThreadBarrierWait, true),
+		add("pthread_barrier_destory", handlePThreadBarrierDestory, true),
+		add("pthread_self", handlePThreadSelf, true),
+		add("valloc", handleValloc, true),
+		//@hy
+		add("make_taint", handleMakeTaint, false),
 
 #undef addDNR
 #undef add  
@@ -773,4 +790,104 @@ void SpecialFunctionHandler::handleDivRemOverflow(ExecutionState &state,
   executor.terminateStateOnError(state,
                                  "overflow on division or remainder",
                                  "overflow.err");
+}
+
+void SpecialFunctionHandler::handlePThreadCreate(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	//std::cerr << "catch pthread create" << std::endl;
+	unsigned result = executor.executePThreadCreate(state, target, arguments);
+	executor.bindLocal(target, state, ConstantExpr::create(result, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handlePThreadJoin(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	unsigned result = executor.executePThreadJoin(state, target, arguments);
+	executor.bindLocal(target, state, ConstantExpr::create(result, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handlePThreadCancel(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	//std::cerr << "catch pthread cancel" << std::endl;
+}
+
+void SpecialFunctionHandler::handlePThreadTestCancel(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	//std::cerr << "catch pthread test cancel" << std::endl;
+}
+
+void SpecialFunctionHandler::handlePThreadMutexLock(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	//std::cerr << "catch pthread mutex lock" << std::endl;
+	unsigned result = executor.executePThreadMutexLock(state, target, arguments);
+	executor.bindLocal(target, state, ConstantExpr::create(result, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handlePThreadMutexUnlock(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	//std::cerr << "catch pthread mutex unlock" << std::endl;
+	unsigned result = executor.executePThreadMutexUnlock(state, target, arguments);
+	executor.bindLocal(target, state, ConstantExpr::create(result, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handlePThreadCondWait(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	//std::cerr << "catch pthread cond wait" << std::endl;
+	unsigned result = executor.executePThreadCondWait(state, target, arguments);
+	executor.bindLocal(target, state, ConstantExpr::create(result, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handlePThreadCondSignal(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	//std::cerr << "catch pthread cond signal" << std::endl;
+	unsigned result = executor.executePThreadCondSignal(state, target, arguments);
+		executor.bindLocal(target, state, ConstantExpr::create(result, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handlePThreadCondBroadcast(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	//std::cerr << "catch pthread cond signal" << std::endl;
+	unsigned result = executor.executePThreadCondBroadcast(state, target, arguments);
+		executor.bindLocal(target, state, ConstantExpr::create(result, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handlePThreadExit(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	//executor.terminateStateOnExit(state);
+}
+
+void SpecialFunctionHandler::handlePThreadBarrierInit(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	unsigned result = executor.executePThreadBarrierInit(state, target, arguments);
+			executor.bindLocal(target, state, ConstantExpr::create(result, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handlePThreadBarrierWait(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	unsigned result = executor.executePThreadBarrierWait(state, target, arguments);
+			executor.bindLocal(target, state, ConstantExpr::create(result, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handlePThreadBarrierDestory(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	unsigned result = executor.executePThreadBarrierDestory(state, target, arguments);
+			executor.bindLocal(target, state, ConstantExpr::create(result, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handlePThreadSelf(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	executor.bindLocal(target, state, ConstantExpr::create(state.currentThread->threadId, Expr::Int32));
+}
+
+void SpecialFunctionHandler::handleValloc(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	assert(arguments.size() == 1 && "invalid number of arguments to valloc");
+	executor.executeAlloc(state, arguments[0], false, target);
+}
+
+
+void SpecialFunctionHandler::handleMakeTaint(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+
+	assert( arguments.size() == 1 && "invalid number of arguments to klee_make_taint");
+	//doing nothing, and really do it at TaintListener.
 }
