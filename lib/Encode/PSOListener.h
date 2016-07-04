@@ -8,22 +8,28 @@
 #ifndef PSOLISTENER_H_
 #define PSOLISTENER_H_
 
-#include "AddressSpace.h"
-#include "Executor.h"
-#include "Memory.h"
-#include "BarrierInfo.h"
-#include "klee/Internal/Module/KInstruction.h"
-#include "klee/ExecutionState.h"
-#include "RuntimeDataManager.h"
+#include <map>
+#include <sstream>
+#include <string>
+
+#include "../../include/klee/Config/Version.h"
+#include "../../include/klee/ExecutionState.h"
+#include "../../include/klee/Expr.h"
+#include "../../include/klee/util/Ref.h"
+#include "../Core/AddressSpace.h"
+#include "../Thread/BarrierInfo.h"
+#include "../Thread/StackType.h"
 #include "BitcodeListener.h"
 
-#include <sstream>
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <map>
+namespace klee {
+class RuntimeDataManager;
+} /* namespace klee */
+namespace llvm {
+class Constant;
+class ConstantExpr;
+class Function;
+} /* namespace llvm */
 
-#include "llvm/Support/CallSite.h"
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"

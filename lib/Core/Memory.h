@@ -173,6 +173,9 @@ public:
 
   bool readOnly;
 
+  ///@hy
+  std::set<ref<Expr> > isTaint;
+
 public:
   /// Create a new object state for the given memory object with concrete
   /// contents. The initial contents are undefined, it is the callers
@@ -189,6 +192,8 @@ public:
   const MemoryObject *getObject() const { return object; }
 
   void setReadOnly(bool ro) { readOnly = ro; }
+  void insertTaint(ref<Expr> address) { isTaint.insert(address); }
+  void eraseTaint(ref<Expr> address) { isTaint.erase(address); }
 
   // make contents all concrete and zero
   void initializeToZero();

@@ -174,11 +174,16 @@ public:
 
   unsigned refCount;
 
+	//added by liupei stand for whether it is a float point
+	bool isFloat;
+	///@hy
+	bool isTaint;
+
 protected:  
   unsigned hashValue;
   
 public:
-  Expr() : refCount(0) { Expr::count++; }
+  Expr() : refCount(0), isFloat(false), isTaint(false), hashValue(0) { Expr::count++; }
   virtual ~Expr() { Expr::count--; } 
 
   virtual Kind getKind() const = 0;

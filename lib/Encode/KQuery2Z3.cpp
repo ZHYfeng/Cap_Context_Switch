@@ -202,7 +202,7 @@ z3::expr KQuery2Z3::eachExprToZ3(ref<Expr> &ele) {
 		else
 			assert("file: kQuery2z3, Expr::Concat" && false);
 		const std::string varName = re->updates.root->name;
-		if (re->updates.root->isFloat) {  //float point symbolics
+		if (ce->isFloat) {  //float point symbolics
 //				std::cerr << "build float " << varName << std::endl;
 			res = z3_ctx.constant(varName.c_str(), z3_ctx.real_sort());
 		} else {

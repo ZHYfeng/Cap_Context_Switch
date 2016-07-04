@@ -8,12 +8,22 @@
 #ifndef LIB_CORE_TAINTLISTENER_H_
 #define LIB_CORE_TAINTLISTENER_H_
 
-#include "Executor.h"
-#include "RuntimeDataManager.h"
+#include <map>
+#include <string>
+#include <vector>
+
+#include "../../include/klee/ExecutionState.h"
+#include "../../include/klee/Expr.h"
+#include "../../include/klee/util/Ref.h"
+#include "../Core/AddressSpace.h"
+#include "../Thread/StackType.h"
 #include "BitcodeListener.h"
+#include "Event.h"
 #include "FilterSymbolicExpr.h"
-#include "klee/Internal/Module/KInstruction.h"
-#include "klee/ExecutionState.h"
+
+namespace klee {
+class RuntimeDataManager;
+} /* namespace klee */
 
 namespace llvm {
 class Type;

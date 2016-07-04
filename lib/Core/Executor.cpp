@@ -987,8 +987,11 @@ ref<klee::ConstantExpr> Executor::evalConstant(const Constant *c) {
   } else {
     if (const ConstantInt *ci = dyn_cast<ConstantInt>(c)) {
       return ConstantExpr::alloc(ci->getValue());
-    } else if (const ConstantFP *cf = dyn_cast<ConstantFP>(c)) {      
-      return ConstantExpr::alloc(cf->getValueAPF().bitcastToAPInt());
+    } else if (const ConstantFP *cf = dyn_cast<ConstantFP>(c)) {
+		ref<Expr> result = ConstantExpr::alloc(
+				cf->getValueAPF().bitcastToAPInt());
+		result.get()->isFloat = true;
+		return cast<ConstantExpr>(result);
     } else if (const GlobalValue *gv = dyn_cast<GlobalValue>(c)) {
       return globalAddresses.find(gv)->second;
     } else if (isa<ConstantPointerNull>(c)) {
@@ -2088,317 +2091,556 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
     // Floating point instructions
 
-  case Instruction::FAdd: {
-    ref<ConstantExpr> left = toConstant(state, eval(ki, 0, state).value,
-                                        "floating point");
-    ref<ConstantExpr> right = toConstant(state, eval(ki, 1, state).value,
-                                         "floating point");
-    if (!fpWidthToSemantics(left->getWidth()) ||
-        !fpWidthToSemantics(right->getWidth()))
-      return terminateStateOnExecError(state, "Unsupported FAdd operation");
+	case Instruction::FAdd: {
+		ref<Expr> originLeft = eval(ki, 0, state).value;
+		ref<Expr> originRight = eval(ki, 1, state).value;
+
+		ConstantExpr *leftCE = dyn_cast<ConstantExpr>(originLeft);
+		ConstantExpr *rightCE = dyn_cast<ConstantExpr>(originRight);
+		if (leftCE != NULL && rightCE != NULL) {
+			ref<ConstantExpr> left = toConstant(state, eval(ki, 0, state).value, "floating point");
+			ref<ConstantExpr> right = toConstant(state, eval(ki, 1, state).value, "floating point");
+			if (!fpWidthToSemantics(left->getWidth()) || !fpWidthToSemantics(right->getWidth()))
+				return terminateStateOnExecError(state, "Unsupported FAdd operation");
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-    llvm::APFloat Res(*fpWidthToSemantics(left->getWidth()), left->getAPValue());
-    Res.add(APFloat(*fpWidthToSemantics(right->getWidth()),right->getAPValue()), APFloat::rmNearestTiesToEven);
+			llvm::APFloat Res(*fpWidthToSemantics(left->getWidth()), left->getAPValue());
+			Res.add(APFloat(*fpWidthToSemantics(right->getWidth()), right->getAPValue()), APFloat::rmNearestTiesToEven);
 #else
-    llvm::APFloat Res(left->getAPValue());
-    Res.add(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
+			llvm::APFloat Res(left->getAPValue());
+			Res.add(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
 #endif
-    bindLocal(ki, state, ConstantExpr::alloc(Res.bitcastToAPInt()));
-    break;
-  }
+			ref<Expr> result = ConstantExpr::alloc(Res.bitcastToAPInt());
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+		} else {
+			ref<Expr> res = AddExpr::create(originLeft, originRight);
+			res.get()->isFloat = true;
+			bindLocal(ki, state, res);
+		}
+		break;
+	}
 
-  case Instruction::FSub: {
-    ref<ConstantExpr> left = toConstant(state, eval(ki, 0, state).value,
-                                        "floating point");
-    ref<ConstantExpr> right = toConstant(state, eval(ki, 1, state).value,
-                                         "floating point");
-    if (!fpWidthToSemantics(left->getWidth()) ||
-        !fpWidthToSemantics(right->getWidth()))
-      return terminateStateOnExecError(state, "Unsupported FSub operation");
+	case Instruction::FSub: {
+		ref<Expr> originLeft = eval(ki, 0, state).value;
+		ref<Expr> originRight = eval(ki, 1, state).value;
+
+		ConstantExpr *leftCE = dyn_cast<ConstantExpr>(originLeft);
+		ConstantExpr *rightCE = dyn_cast<ConstantExpr>(originRight);
+		if (leftCE != NULL && rightCE != NULL) {
+			ref<ConstantExpr> left = toConstant(state,
+					eval(ki, 0, state).value, "floating point");
+			ref<ConstantExpr> right = toConstant(state,
+					eval(ki, 1, state).value, "floating point");
+			if (!fpWidthToSemantics(left->getWidth())
+					|| !fpWidthToSemantics(right->getWidth()))
+				return terminateStateOnExecError(state,
+						"Unsupported FSub operation");
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-    llvm::APFloat Res(*fpWidthToSemantics(left->getWidth()), left->getAPValue());
-    Res.subtract(APFloat(*fpWidthToSemantics(right->getWidth()), right->getAPValue()), APFloat::rmNearestTiesToEven);
+			llvm::APFloat Res(*fpWidthToSemantics(left->getWidth()),
+					left->getAPValue());
+			Res.subtract(
+					APFloat(*fpWidthToSemantics(right->getWidth()),
+							right->getAPValue()), APFloat::rmNearestTiesToEven);
 #else
-    llvm::APFloat Res(left->getAPValue());
-    Res.subtract(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
+			llvm::APFloat Res(left->getAPValue());
+			Res.subtract(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
 #endif
-    bindLocal(ki, state, ConstantExpr::alloc(Res.bitcastToAPInt()));
-    break;
-  }
- 
-  case Instruction::FMul: {
-    ref<ConstantExpr> left = toConstant(state, eval(ki, 0, state).value,
-                                        "floating point");
-    ref<ConstantExpr> right = toConstant(state, eval(ki, 1, state).value,
-                                         "floating point");
-    if (!fpWidthToSemantics(left->getWidth()) ||
-        !fpWidthToSemantics(right->getWidth()))
-      return terminateStateOnExecError(state, "Unsupported FMul operation");
+			ref<Expr> result = ConstantExpr::alloc(Res.bitcastToAPInt());
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+		} else {
+			originLeft.get()->isFloat = true;
+			originRight.get()->isFloat = true;
+			ref<Expr> res = SubExpr::create(originLeft, originRight);
+			res.get()->isFloat = true;
+			bindLocal(ki, state, res);
+		}
+		break;
+	}
 
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-    llvm::APFloat Res(*fpWidthToSemantics(left->getWidth()), left->getAPValue());
-    Res.multiply(APFloat(*fpWidthToSemantics(right->getWidth()), right->getAPValue()), APFloat::rmNearestTiesToEven);
-#else
-    llvm::APFloat Res(left->getAPValue());
-    Res.multiply(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
-#endif
-    bindLocal(ki, state, ConstantExpr::alloc(Res.bitcastToAPInt()));
-    break;
-  }
+	case Instruction::FMul: {
+		ref<Expr> originLeft = eval(ki, 0, state).value;
+		ref<Expr> originRight = eval(ki, 1, state).value;
 
-  case Instruction::FDiv: {
-    ref<ConstantExpr> left = toConstant(state, eval(ki, 0, state).value,
-                                        "floating point");
-    ref<ConstantExpr> right = toConstant(state, eval(ki, 1, state).value,
-                                         "floating point");
-    if (!fpWidthToSemantics(left->getWidth()) ||
-        !fpWidthToSemantics(right->getWidth()))
-      return terminateStateOnExecError(state, "Unsupported FDiv operation");
-
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-    llvm::APFloat Res(*fpWidthToSemantics(left->getWidth()), left->getAPValue());
-    Res.divide(APFloat(*fpWidthToSemantics(right->getWidth()), right->getAPValue()), APFloat::rmNearestTiesToEven);
-#else
-    llvm::APFloat Res(left->getAPValue());
-    Res.divide(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
-#endif
-    bindLocal(ki, state, ConstantExpr::alloc(Res.bitcastToAPInt()));
-    break;
-  }
-
-  case Instruction::FRem: {
-    ref<ConstantExpr> left = toConstant(state, eval(ki, 0, state).value,
-                                        "floating point");
-    ref<ConstantExpr> right = toConstant(state, eval(ki, 1, state).value,
-                                         "floating point");
-    if (!fpWidthToSemantics(left->getWidth()) ||
-        !fpWidthToSemantics(right->getWidth()))
-      return terminateStateOnExecError(state, "Unsupported FRem operation");
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-    llvm::APFloat Res(*fpWidthToSemantics(left->getWidth()), left->getAPValue());
-    Res.mod(APFloat(*fpWidthToSemantics(right->getWidth()),right->getAPValue()),
-            APFloat::rmNearestTiesToEven);
-#else
-    llvm::APFloat Res(left->getAPValue());
-    Res.mod(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
-#endif
-    bindLocal(ki, state, ConstantExpr::alloc(Res.bitcastToAPInt()));
-    break;
-  }
-
-  case Instruction::FPTrunc: {
-    FPTruncInst *fi = cast<FPTruncInst>(i);
-    Expr::Width resultType = getWidthForLLVMType(fi->getType());
-    ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
-                                       "floating point");
-    if (!fpWidthToSemantics(arg->getWidth()) || resultType > arg->getWidth())
-      return terminateStateOnExecError(state, "Unsupported FPTrunc operation");
+		ConstantExpr *leftCE = dyn_cast<ConstantExpr>(originLeft);
+		ConstantExpr *rightCE = dyn_cast<ConstantExpr>(originRight);
+		if (leftCE != NULL && rightCE != NULL) {
+			ref<ConstantExpr> left = toConstant(state,
+					eval(ki, 0, state).value, "floating point");
+			ref<ConstantExpr> right = toConstant(state,
+					eval(ki, 1, state).value, "floating point");
+			if (!fpWidthToSemantics(left->getWidth())
+					|| !fpWidthToSemantics(right->getWidth()))
+				return terminateStateOnExecError(state,
+						"Unsupported FMul operation");
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-    llvm::APFloat Res(*fpWidthToSemantics(arg->getWidth()), arg->getAPValue());
+			llvm::APFloat Res(*fpWidthToSemantics(left->getWidth()),
+					left->getAPValue());
+			Res.multiply(
+					APFloat(*fpWidthToSemantics(right->getWidth()),
+							right->getAPValue()), APFloat::rmNearestTiesToEven);
 #else
-    llvm::APFloat Res(arg->getAPValue());
+			llvm::APFloat Res(left->getAPValue());
+			Res.multiply(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
 #endif
-    bool losesInfo = false;
-    Res.convert(*fpWidthToSemantics(resultType),
-                llvm::APFloat::rmNearestTiesToEven,
-                &losesInfo);
-    bindLocal(ki, state, ConstantExpr::alloc(Res));
-    break;
-  }
+			ref<Expr> result = ConstantExpr::alloc(Res.bitcastToAPInt());
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+//    bindLocal(ki, state.currentStack, ConstantExpr::alloc(Res.bitcastToAPInt()));
+		} else {
+			originLeft.get()->isFloat = true;
+			originRight.get()->isFloat = true;
+//			cerr << "MulExpr : "<< originLeft << " * "<< originRight << "\n";
+			ref<Expr> res = MulExpr::create(originLeft, originRight);
+//			cerr << "MulExpr : "<< res << "\n";
+			res.get()->isFloat = true;
+			bindLocal(ki, state, res);
+		}
+		break;
+	}
 
-  case Instruction::FPExt: {
-    FPExtInst *fi = cast<FPExtInst>(i);
-    Expr::Width resultType = getWidthForLLVMType(fi->getType());
-    ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
-                                        "floating point");
-    if (!fpWidthToSemantics(arg->getWidth()) || arg->getWidth() > resultType)
-      return terminateStateOnExecError(state, "Unsupported FPExt operation");
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-    llvm::APFloat Res(*fpWidthToSemantics(arg->getWidth()), arg->getAPValue());
-#else
-    llvm::APFloat Res(arg->getAPValue());
-#endif
-    bool losesInfo = false;
-    Res.convert(*fpWidthToSemantics(resultType),
-                llvm::APFloat::rmNearestTiesToEven,
-                &losesInfo);
-    bindLocal(ki, state, ConstantExpr::alloc(Res));
-    break;
-  }
+	case Instruction::FDiv: {
+		ref<Expr> originLeft = eval(ki, 0, state).value;
+		ref<Expr> originRight = eval(ki, 1, state).value;
 
-  case Instruction::FPToUI: {
-    FPToUIInst *fi = cast<FPToUIInst>(i);
-    Expr::Width resultType = getWidthForLLVMType(fi->getType());
-    ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
-                                       "floating point");
-    if (!fpWidthToSemantics(arg->getWidth()) || resultType > 64)
-      return terminateStateOnExecError(state, "Unsupported FPToUI operation");
-
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-    llvm::APFloat Arg(*fpWidthToSemantics(arg->getWidth()), arg->getAPValue());
-#else
-    llvm::APFloat Arg(arg->getAPValue());
-#endif
-    uint64_t value = 0;
-    bool isExact = true;
-    Arg.convertToInteger(&value, resultType, false,
-                         llvm::APFloat::rmTowardZero, &isExact);
-    bindLocal(ki, state, ConstantExpr::alloc(value, resultType));
-    break;
-  }
-
-  case Instruction::FPToSI: {
-    FPToSIInst *fi = cast<FPToSIInst>(i);
-    Expr::Width resultType = getWidthForLLVMType(fi->getType());
-    ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
-                                       "floating point");
-    if (!fpWidthToSemantics(arg->getWidth()) || resultType > 64)
-      return terminateStateOnExecError(state, "Unsupported FPToSI operation");
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-    llvm::APFloat Arg(*fpWidthToSemantics(arg->getWidth()), arg->getAPValue());
-#else
-    llvm::APFloat Arg(arg->getAPValue());
-
-#endif
-    uint64_t value = 0;
-    bool isExact = true;
-    Arg.convertToInteger(&value, resultType, true,
-                         llvm::APFloat::rmTowardZero, &isExact);
-    bindLocal(ki, state, ConstantExpr::alloc(value, resultType));
-    break;
-  }
-
-  case Instruction::UIToFP: {
-    UIToFPInst *fi = cast<UIToFPInst>(i);
-    Expr::Width resultType = getWidthForLLVMType(fi->getType());
-    ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
-                                       "floating point");
-    const llvm::fltSemantics *semantics = fpWidthToSemantics(resultType);
-    if (!semantics)
-      return terminateStateOnExecError(state, "Unsupported UIToFP operation");
-    llvm::APFloat f(*semantics, 0);
-    f.convertFromAPInt(arg->getAPValue(), false,
-                       llvm::APFloat::rmNearestTiesToEven);
-
-    bindLocal(ki, state, ConstantExpr::alloc(f));
-    break;
-  }
-
-  case Instruction::SIToFP: {
-    SIToFPInst *fi = cast<SIToFPInst>(i);
-    Expr::Width resultType = getWidthForLLVMType(fi->getType());
-    ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
-                                       "floating point");
-    const llvm::fltSemantics *semantics = fpWidthToSemantics(resultType);
-    if (!semantics)
-      return terminateStateOnExecError(state, "Unsupported SIToFP operation");
-    llvm::APFloat f(*semantics, 0);
-    f.convertFromAPInt(arg->getAPValue(), true,
-                       llvm::APFloat::rmNearestTiesToEven);
-
-    bindLocal(ki, state, ConstantExpr::alloc(f));
-    break;
-  }
-
-  case Instruction::FCmp: {
-    FCmpInst *fi = cast<FCmpInst>(i);
-    ref<ConstantExpr> left = toConstant(state, eval(ki, 0, state).value,
-                                        "floating point");
-    ref<ConstantExpr> right = toConstant(state, eval(ki, 1, state).value,
-                                         "floating point");
-    if (!fpWidthToSemantics(left->getWidth()) ||
-        !fpWidthToSemantics(right->getWidth()))
-      return terminateStateOnExecError(state, "Unsupported FCmp operation");
+		ConstantExpr *leftCE = dyn_cast<ConstantExpr>(originLeft);
+		ConstantExpr *rightCE = dyn_cast<ConstantExpr>(originRight);
+		if (leftCE != NULL && rightCE != NULL) {
+			ref<ConstantExpr> left = toConstant(state,
+					eval(ki, 0, state).value, "floating point");
+			ref<ConstantExpr> right = toConstant(state,
+					eval(ki, 1, state).value, "floating point");
+			if (!fpWidthToSemantics(left->getWidth())
+					|| !fpWidthToSemantics(right->getWidth()))
+				return terminateStateOnExecError(state,
+						"Unsupported FDiv operation");
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-    APFloat LHS(*fpWidthToSemantics(left->getWidth()),left->getAPValue());
-    APFloat RHS(*fpWidthToSemantics(right->getWidth()),right->getAPValue());
+			llvm::APFloat Res(*fpWidthToSemantics(left->getWidth()),
+					left->getAPValue());
+			Res.divide(
+					APFloat(*fpWidthToSemantics(right->getWidth()),
+							right->getAPValue()), APFloat::rmNearestTiesToEven);
 #else
-    APFloat LHS(left->getAPValue());
-    APFloat RHS(right->getAPValue());
+			llvm::APFloat Res(left->getAPValue());
+			Res.divide(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
 #endif
-    APFloat::cmpResult CmpRes = LHS.compare(RHS);
+			ref<Expr> result = ConstantExpr::alloc(Res.bitcastToAPInt());
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+//    bindLocal(ki, state.currentStack, ConstantExpr::alloc(Res.bitcastToAPInt()));
+		} else {
+			originLeft.get()->isFloat = true;
+			originRight.get()->isFloat = true;
+			ref<Expr> result = SDivExpr::create(originLeft, originRight);
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+		}
+		break;
+	}
 
-    bool Result = false;
-    switch( fi->getPredicate() ) {
-      // Predicates which only care about whether or not the operands are NaNs.
-    case FCmpInst::FCMP_ORD:
-      Result = CmpRes != APFloat::cmpUnordered;
-      break;
+	case Instruction::FRem: {
+		ref<Expr> originLeft = eval(ki, 0, state).value;
+		ref<Expr> originRight = eval(ki, 1, state).value;
 
-    case FCmpInst::FCMP_UNO:
-      Result = CmpRes == APFloat::cmpUnordered;
-      break;
+		ConstantExpr *leftCE = dyn_cast<ConstantExpr>(originLeft);
+		ConstantExpr *rightCE = dyn_cast<ConstantExpr>(originRight);
+		if (leftCE != NULL && rightCE != NULL) {
+			ref<ConstantExpr> left = toConstant(state,
+					eval(ki, 0, state).value, "floating point");
+			ref<ConstantExpr> right = toConstant(state,
+					eval(ki, 1, state).value, "floating point");
+			if (!fpWidthToSemantics(left->getWidth())
+					|| !fpWidthToSemantics(right->getWidth()))
+				return terminateStateOnExecError(state,
+						"Unsupported FRem operation");
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+			llvm::APFloat Res(*fpWidthToSemantics(left->getWidth()),
+					left->getAPValue());
+			Res.remainder(
+					APFloat(*fpWidthToSemantics(right->getWidth()),
+							right->getAPValue()));
+#else
+			llvm::APFloat Res(left->getAPValue());
+			Res.mod(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
+#endif
+			ref<Expr> result = ConstantExpr::alloc(Res.bitcastToAPInt());
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+//    bindLocal(ki, state.currentStack, ConstantExpr::alloc(Res.bitcastToAPInt()));
+		} else {
+			ref<Expr> result = SRemExpr::create(originLeft, originRight);
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+		}
+		break;
+	}
 
-      // Ordered comparisons return false if either operand is NaN.  Unordered
-      // comparisons return true if either operand is NaN.
-    case FCmpInst::FCMP_UEQ:
-      if (CmpRes == APFloat::cmpUnordered) {
-        Result = true;
-        break;
-      }
-    case FCmpInst::FCMP_OEQ:
-      Result = CmpRes == APFloat::cmpEqual;
-      break;
+	case Instruction::FPTrunc: {
 
-    case FCmpInst::FCMP_UGT:
-      if (CmpRes == APFloat::cmpUnordered) {
-        Result = true;
-        break;
-      }
-    case FCmpInst::FCMP_OGT:
-      Result = CmpRes == APFloat::cmpGreaterThan;
-      break;
+		FPTruncInst *fi = cast<FPTruncInst>(i);
+		ref<Expr> srcExpr = eval(ki, 0, state).value;
+		ConstantExpr *srcCons = dyn_cast<ConstantExpr>(srcExpr);
+		if (srcCons != NULL) {
+//	  FPTruncInst *fi = cast<FPTruncInst>(i);
+			Expr::Width resultType = getWidthForLLVMType(fi->getType());
+			ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
+					"floating point");
+			if (!fpWidthToSemantics(arg->getWidth())
+					|| resultType > arg->getWidth())
+				return terminateStateOnExecError(state,
+						"Unsupported FPTrunc operation");
 
-    case FCmpInst::FCMP_UGE:
-      if (CmpRes == APFloat::cmpUnordered) {
-        Result = true;
-        break;
-      }
-    case FCmpInst::FCMP_OGE:
-      Result = CmpRes == APFloat::cmpGreaterThan || CmpRes == APFloat::cmpEqual;
-      break;
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+			llvm::APFloat Res(*fpWidthToSemantics(arg->getWidth()),
+					arg->getAPValue());
+#else
+			llvm::APFloat Res(arg->getAPValue());
+#endif
+			bool losesInfo = false;
+			Res.convert(*fpWidthToSemantics(resultType),
+					llvm::APFloat::rmNearestTiesToEven, &losesInfo);
+			ref<Expr> result = ConstantExpr::alloc(Res);
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+//    bindLocal(ki, state.currentStack, ConstantExpr::alloc(Res));
+		} else {
+			ref<Expr> result = ExtractExpr::create(eval(ki, 0, state).value, 0,
+					getWidthForLLVMType(fi->getType()));
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+		}
+		break;
+	}
 
-    case FCmpInst::FCMP_ULT:
-      if (CmpRes == APFloat::cmpUnordered) {
-        Result = true;
-        break;
-      }
-    case FCmpInst::FCMP_OLT:
-      Result = CmpRes == APFloat::cmpLessThan;
-      break;
+	case Instruction::FPExt: {
+		FPExtInst *fi = cast<FPExtInst>(i);
+		ref<Expr> srcExpr = eval(ki, 0, state).value;
+		ConstantExpr *srcCons = dyn_cast<ConstantExpr>(srcExpr);
+		if (srcCons != NULL) {
+//    FPExtInst *fi = cast<FPExtInst>(i);
+			Expr::Width resultType = getWidthForLLVMType(fi->getType());
+			ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
+					"floating point");
+			if (!fpWidthToSemantics(arg->getWidth())
+					|| arg->getWidth() > resultType)
+				return terminateStateOnExecError(state,
+						"Unsupported FPExt operation");
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+			llvm::APFloat Res(*fpWidthToSemantics(arg->getWidth()),
+					arg->getAPValue());
+#else
+			llvm::APFloat Res(arg->getAPValue());
+#endif
+			bool losesInfo = false;
+			Res.convert(*fpWidthToSemantics(resultType),
+					llvm::APFloat::rmNearestTiesToEven, &losesInfo);
+			ref<Expr> result = ConstantExpr::alloc(Res);
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+		} else {
+			ref<Expr> result = SExtExpr::create(eval(ki, 0, state).value,
+					getWidthForLLVMType(fi->getType()));
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+		}
+		break;
+	}
 
-    case FCmpInst::FCMP_ULE:
-      if (CmpRes == APFloat::cmpUnordered) {
-        Result = true;
-        break;
-      }
-    case FCmpInst::FCMP_OLE:
-      Result = CmpRes == APFloat::cmpLessThan || CmpRes == APFloat::cmpEqual;
-      break;
+	case Instruction::FPToUI: {
+		FPToUIInst *fi = cast<FPToUIInst>(i);
+		ref<Expr> srcExpr = eval(ki, 0, state).value;
+		ConstantExpr *srcCons = dyn_cast<ConstantExpr>(srcExpr);
+		if (srcCons != NULL) {
+//    FPToUIInst *fi = cast<FPToUIInst>(i);
+			Expr::Width resultType = getWidthForLLVMType(fi->getType());
+			ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
+					"floating point");
+			if (!fpWidthToSemantics(arg->getWidth()) || resultType > 64)
+				return terminateStateOnExecError(state,
+						"Unsupported FPToUI operation");
 
-    case FCmpInst::FCMP_UNE:
-      Result = CmpRes == APFloat::cmpUnordered || CmpRes != APFloat::cmpEqual;
-      break;
-    case FCmpInst::FCMP_ONE:
-      Result = CmpRes != APFloat::cmpUnordered && CmpRes != APFloat::cmpEqual;
-      break;
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+			llvm::APFloat Arg(*fpWidthToSemantics(arg->getWidth()),
+					arg->getAPValue());
+#else
+			llvm::APFloat Arg(arg->getAPValue());
+#endif
+			uint64_t value = 0;
+			bool isExact = true;
+			Arg.convertToInteger(&value, resultType, false,
+					llvm::APFloat::rmTowardZero, &isExact);
+			bindLocal(ki, state, ConstantExpr::alloc(value, resultType));
+		} else {
+			ref<Expr> result = ExtractExpr::alloc(eval(ki, 0, state).value, 0,
+					getWidthForLLVMType(fi->getType()));
+			result.get()->isFloat = false;
+			bindLocal(ki, state, result);
+		}
+		break;
+	}
 
-    default:
-      assert(0 && "Invalid FCMP predicate!");
-    case FCmpInst::FCMP_FALSE:
-      Result = false;
-      break;
-    case FCmpInst::FCMP_TRUE:
-      Result = true;
-      break;
-    }
+	case Instruction::FPToSI: {
 
-    bindLocal(ki, state, ConstantExpr::alloc(Result, Expr::Bool));
-    break;
-  }
+		FPToSIInst *fi = cast<FPToSIInst>(i);
+		ref<Expr> srcExpr = eval(ki, 0, state).value;
+		ConstantExpr *srcCons = dyn_cast<ConstantExpr>(srcExpr);
+		if (srcCons != NULL) {
+//	  FPToSIInst *fi = cast<FPToSIInst>(i);
+			Expr::Width resultType = getWidthForLLVMType(fi->getType());
+			ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
+					"floating point");
+			if (!fpWidthToSemantics(arg->getWidth()) || resultType > 64)
+				return terminateStateOnExecError(state,
+						"Unsupported FPToSI operation");
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+			llvm::APFloat Arg(*fpWidthToSemantics(arg->getWidth()),
+					arg->getAPValue());
+#else
+			llvm::APFloat Arg(arg->getAPValue());
+
+#endif
+			uint64_t value = 0;
+			bool isExact = true;
+			Arg.convertToInteger(&value, resultType, true,
+					llvm::APFloat::rmTowardZero, &isExact);
+			bindLocal(ki, state, ConstantExpr::alloc(value, resultType));
+		} else {
+			ref<Expr> result = ExtractExpr::alloc(eval(ki, 0, state).value, 0,
+					getWidthForLLVMType(fi->getType()));
+			result.get()->isFloat = false;
+//			std::cerr << "fptosi in exe ";
+//			std::cerr << result.get()->getKind() << "\n";
+//			result.get()->dump();
+			bindLocal(ki, state, result);
+		}
+		break;
+	}
+
+	case Instruction::UIToFP: {
+		UIToFPInst *fi = cast<UIToFPInst>(i);
+		ref<Expr> srcExpr = eval(ki, 0, state).value;
+		ConstantExpr *srcCons = dyn_cast<ConstantExpr>(srcExpr);
+		if (srcCons != NULL) {
+//    UIToFPInst *fi = cast<UIToFPInst>(i);
+			Expr::Width resultType = getWidthForLLVMType(fi->getType());
+			ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
+					"floating point");
+			const llvm::fltSemantics *semantics = fpWidthToSemantics(
+					resultType);
+			if (!semantics)
+				return terminateStateOnExecError(state,
+						"Unsupported UIToFP operation");
+			llvm::APFloat f(*semantics, 0);
+			f.convertFromAPInt(arg->getAPValue(), false,
+					llvm::APFloat::rmNearestTiesToEven);
+
+			ref<Expr> result = ConstantExpr::alloc(f);
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+		} else {
+			ref<Expr> result = SExtExpr::alloc(eval(ki, 0, state).value,
+					getWidthForLLVMType(fi->getType()));
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+		}
+		break;
+	}
+
+	case Instruction::SIToFP: {
+		SIToFPInst *fi = cast<SIToFPInst>(i);
+
+		ref<Expr> srcExpr = eval(ki, 0, state).value;
+		ConstantExpr *srcCons = dyn_cast<ConstantExpr>(srcExpr);
+		if (srcCons != NULL) {
+//	  SIToFPInst *fi = cast<SIToFPInst>(i);
+			Expr::Width resultType = getWidthForLLVMType(fi->getType());
+			ref<ConstantExpr> arg = toConstant(state, eval(ki, 0, state).value,
+					"floating point");
+			const llvm::fltSemantics *semantics = fpWidthToSemantics(
+					resultType);
+			if (!semantics)
+				return terminateStateOnExecError(state,
+						"Unsupported SIToFP operation");
+			llvm::APFloat f(*semantics, 0);
+			f.convertFromAPInt(arg->getAPValue(), true,
+					llvm::APFloat::rmNearestTiesToEven);
+
+			ref<Expr> result = ConstantExpr::alloc(f);
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+		} else {
+			ref<Expr> result = SExtExpr::alloc(eval(ki, 0, state).value,
+					getWidthForLLVMType(fi->getType()));
+			result.get()->isFloat = true;
+			bindLocal(ki, state, result);
+		}
+		break;
+	}
+
+	case Instruction::FCmp: {
+		FCmpInst *fi = cast<FCmpInst>(i);
+		ref<Expr> originLeft = eval(ki, 0, state).value;
+		ref<Expr> originRight = eval(ki, 1, state).value;
+		ConstantExpr *leftCE = dyn_cast<ConstantExpr>(originLeft);
+		ConstantExpr *rightCE = dyn_cast<ConstantExpr>(originRight);
+		if (leftCE != NULL && rightCE != NULL) {
+//    FCmpInst *fi = cast<FCmpInst>(i);
+			ref<ConstantExpr> left = toConstant(state,
+					eval(ki, 0, state).value, "floating point");
+			ref<ConstantExpr> right = toConstant(state,
+					eval(ki, 1, state).value, "floating point");
+			if (!fpWidthToSemantics(left->getWidth())
+					|| !fpWidthToSemantics(right->getWidth()))
+				return terminateStateOnExecError(state,
+						"Unsupported FCmp operation");
+
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+			APFloat LHS(*fpWidthToSemantics(left->getWidth()),
+					left->getAPValue());
+			APFloat RHS(*fpWidthToSemantics(right->getWidth()),
+					right->getAPValue());
+#else
+			APFloat LHS(left->getAPValue());
+			APFloat RHS(right->getAPValue());
+#endif
+			APFloat::cmpResult CmpRes = LHS.compare(RHS);
+
+			bool Result = false;
+			switch (fi->getPredicate()) {
+			// Predicates which only care about whether or not the operands are NaNs.
+			case FCmpInst::FCMP_ORD:
+				Result = CmpRes != APFloat::cmpUnordered;
+				break;
+
+			case FCmpInst::FCMP_UNO:
+				Result = CmpRes == APFloat::cmpUnordered;
+				break;
+
+				// Ordered comparisons return false if either operand is NaN.  Unordered
+				// comparisons return true if either operand is NaN.
+			case FCmpInst::FCMP_UEQ:
+				if (CmpRes == APFloat::cmpUnordered) {
+					Result = true;
+					break;
+				}
+			case FCmpInst::FCMP_OEQ:
+				Result = CmpRes == APFloat::cmpEqual;
+				break;
+
+			case FCmpInst::FCMP_UGT:
+				if (CmpRes == APFloat::cmpUnordered) {
+					Result = true;
+					break;
+				}
+			case FCmpInst::FCMP_OGT:
+				Result = CmpRes == APFloat::cmpGreaterThan;
+				break;
+
+			case FCmpInst::FCMP_UGE:
+				if (CmpRes == APFloat::cmpUnordered) {
+					Result = true;
+					break;
+				}
+			case FCmpInst::FCMP_OGE:
+				Result = CmpRes == APFloat::cmpGreaterThan
+						|| CmpRes == APFloat::cmpEqual;
+				break;
+
+			case FCmpInst::FCMP_ULT:
+				if (CmpRes == APFloat::cmpUnordered) {
+					Result = true;
+					break;
+				}
+			case FCmpInst::FCMP_OLT:
+				Result = CmpRes == APFloat::cmpLessThan;
+				break;
+
+			case FCmpInst::FCMP_ULE:
+				if (CmpRes == APFloat::cmpUnordered) {
+					Result = true;
+					break;
+				}
+			case FCmpInst::FCMP_OLE:
+				Result = CmpRes == APFloat::cmpLessThan
+						|| CmpRes == APFloat::cmpEqual;
+				break;
+
+			case FCmpInst::FCMP_UNE:
+				Result = CmpRes == APFloat::cmpUnordered
+						|| CmpRes != APFloat::cmpEqual;
+				break;
+			case FCmpInst::FCMP_ONE:
+				Result = CmpRes != APFloat::cmpUnordered
+						&& CmpRes != APFloat::cmpEqual;
+				break;
+
+			default:
+				assert(0 && "Invalid FCMP predicate!");
+			case FCmpInst::FCMP_FALSE:
+				Result = false;
+				break;
+			case FCmpInst::FCMP_TRUE:
+				Result = true;
+				break;
+			}
+			bindLocal(ki, state, ConstantExpr::alloc(Result, Expr::Bool));
+		} else {
+			switch (fi->getPredicate()) {
+			case FCmpInst::FCMP_ORD:
+				break;
+			case FCmpInst::FCMP_UNO:
+				break;
+			case FCmpInst::FCMP_UEQ:
+				bindLocal(ki, state, EqExpr::alloc(originLeft, originRight));
+				break;
+			case FCmpInst::FCMP_OEQ:
+				bindLocal(ki, state, EqExpr::alloc(originLeft, originRight));
+				break;
+			case FCmpInst::FCMP_UGT:
+				bindLocal(ki, state, SltExpr::alloc(originRight, originLeft));
+				break;
+			case FCmpInst::FCMP_OGT:
+				bindLocal(ki, state, SltExpr::alloc(originRight, originLeft));
+				break;
+			case FCmpInst::FCMP_UGE:
+				bindLocal(ki, state, SleExpr::alloc(originRight, originLeft));
+				break;
+			case FCmpInst::FCMP_OGE:
+				bindLocal(ki, state, SleExpr::alloc(originRight, originLeft));
+				break;
+			case FCmpInst::FCMP_ULT:
+				bindLocal(ki, state, SltExpr::alloc(originLeft, originRight));
+				break;
+			case FCmpInst::FCMP_OLT:
+				bindLocal(ki, state, SltExpr::alloc(originLeft, originRight));
+				break;
+			case FCmpInst::FCMP_ULE:
+				bindLocal(ki, state, SleExpr::alloc(originLeft, originRight));
+				break;
+			case FCmpInst::FCMP_OLE:
+				bindLocal(ki, state, SleExpr::alloc(originLeft, originRight));
+				break;
+			case FCmpInst::FCMP_UNE:
+				bindLocal(ki, state, NeExpr::alloc(originLeft, originRight));
+				break;
+			case FCmpInst::FCMP_ONE:
+				bindLocal(ki, state, NeExpr::alloc(originLeft, originRight));
+				break;
+			case FCmpInst::FCMP_FALSE:
+				bindLocal(ki, state, ConstantExpr::alloc(0, 1));
+			case FCmpInst::FCMP_TRUE:
+				bindLocal(ki, state, ConstantExpr::alloc(1, 1));
+				break;
+			default:
+				assert(0 && "Invalid FCMP predicate!");
+				break;
+			}
+		}
+		break;
+	}
   case Instruction::InsertValue: {
     KGEPInstruction *kgepi = static_cast<KGEPInstruction*>(ki);
 

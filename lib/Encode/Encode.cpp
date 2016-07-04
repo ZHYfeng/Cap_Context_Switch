@@ -410,7 +410,7 @@ void Encode::showInitTrace() {
 	string ErrorInfo;
 	stringstream output;
 	output << "./output_info/" << "Trace" << trace->Id << ".bitcode" ;
-	raw_fd_ostream out_to_file(output.str().c_str(), ErrorInfo, 0x0200);
+	raw_fd_ostream out_to_file(output.str().c_str(), ErrorInfo, sys::fs::F_Append);
 	unsigned size = trace->path.size();
 //bitcode
 	for (unsigned i = 0; i < size; i++) {
@@ -633,8 +633,7 @@ void Encode::showPrefixInfo(Prefix* prefix, Event* ifEvent) {
 	stringstream output;
 	output << "./output_info/" << prefix->getName() << ".bitcode";
 	raw_fd_ostream out_to_file(output.str().c_str(), ErrorInfo,
-//			0x0200);
-			raw_fd_ostream::BLACK);
+			sys::fs::F_Append);
 	cerr << ErrorInfo;
 //out_to_file << "threadId:   "<< "lineNum:    " << "source:" <<"\n";
 //raw_fd_ostream out_to_file("./output_info/counterexample.txt", ErrorInfo, 2 & 0x0200);
@@ -675,7 +674,7 @@ void Encode::printSourceLine(string path, vector<Event *>& trace) {
 	string output;
 	string ErrorInfo;
 	output = path + ".txt";
-	raw_fd_ostream out_to_file(output.c_str(), ErrorInfo, 0x0200);
+	raw_fd_ostream out_to_file(output.c_str(), ErrorInfo, sys::fs::F_Append);
 	out_to_file << "threadId  " << "lineNum   " << "function                 "
 			<< "source" << "\n";
 	unsigned preThreadId = 0, preCodeLine = 0;
@@ -726,7 +725,7 @@ void Encode::printSourceLine(string path,
 	string output;
 	string ErrorInfo;
 	output = "./output_info/" + path + ".source";
-	raw_fd_ostream out_to_file(output.c_str(), ErrorInfo, 0x0200);
+	raw_fd_ostream out_to_file(output.c_str(), ErrorInfo, sys::fs::F_Append);
 	out_to_file << "threadId  " << "lineNum   " << "function                 "
 			<< "source" << "\n";
 
@@ -848,7 +847,7 @@ void Encode::logStatisticInfo() {
 	unsigned readNumber = trace->readSet.size();
 	unsigned writeNumber = trace->writeSet.size();
 	string ErrorInfo;
-	raw_fd_ostream out("./output_info/statistic.info", ErrorInfo, 0x0200);
+	raw_fd_ostream out("./output_info/statistic.info", ErrorInfo, sys::fs::F_Append);
 	out << "#Threads:" << threadNumber << "\n";
 	out << "#Instructions: " << instNumber << "\n";
 	out << "#Locks: " << lockNumber << "\n";

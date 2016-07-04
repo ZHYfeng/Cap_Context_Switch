@@ -14,14 +14,16 @@
 
 #include "../../include/klee/ExecutionState.h"
 #include "../../include/klee/Expr.h"
-#include "../../include/klee/Internal/Module/KInstruction.h"
 #include "../../include/klee/util/Ref.h"
+#include "../Core/AddressSpace.h"
+#include "../Thread/StackType.h"
 #include "BitcodeListener.h"
 #include "Event.h"
-#include "Executor.h"
 #include "FilterSymbolicExpr.h"
-#include "RuntimeDataManager.h"
-#include "Thread.h"
+
+namespace klee {
+class RuntimeDataManager;
+} /* namespace klee */
 
 namespace llvm {
 	class Type;
