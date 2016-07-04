@@ -55,6 +55,29 @@ ExecutionState::ExecutionState(KFunction *kf)
 	condManager.setMutexManager(&mutexManager);
 	threadScheduler = getThreadSchedulerByType(ThreadScheduler::FIFS);
 	Thread* thread = new Thread(getNextThreadId(), NULL, kf);
+	currentStack = &(thread->stack);
+	threadList.addThread(thread);
+	threadScheduler->addItem(thread);
+	currentThread = thread;
+	currentStack->pushFrame(0, kf);
+}
+
+ExecutionState::ExecutionState(KFunction *kf, Prefix* prefix)
+  : depth(0),
+    queryCost(0.),
+    weight(1),
+    instsSinceCovNew(0),
+    coveredNew(false),
+    forkDisabled(false),
+	nextThreadId(1),
+	mutexManager(),
+	condManager(),
+    ptreeNode(0) {
+
+	condManager.setMutexManager(&mutexManager);
+	threadScheduler = new GuidedThreadScheduler(this, ThreadScheduler::FIFS, prefix);
+	Thread* thread = new Thread(getNextThreadId(), NULL, kf);
+	currentStack = &(thread->stack);
 	threadList.addThread(thread);
 	threadScheduler->addItem(thread);
 	currentThread = thread;
@@ -62,7 +85,12 @@ ExecutionState::ExecutionState(KFunction *kf)
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
-    : constraints(assumptions), queryCost(0.), ptreeNode(0) {}
+    : 	constraints(assumptions),
+		depth(0),
+	    ptreeNode(0) {
+
+	assert(0 && "ExecutionState(const std::vector<ref<Expr> > &assumptions)");
+}
 
 ExecutionState::~ExecutionState() {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -106,8 +134,9 @@ ExecutionState::ExecutionState(const ExecutionState& state)
   currentThread = findThreadById(state.currentThread->threadId);
   std::map<unsigned, Thread*> unfinishedThread = threadList.getAllUnfinishedThreads();
   threadScheduler = new FIFSThreadScheduler(*(FIFSThreadScheduler*)(state.threadScheduler), unfinishedThread);
-//  threadScheduler = new PreemptiveThreadScheduler(*(PreemptiveThreadScheduler*)(state.threadScheduler), unfinishedThread);
 }
+
+
 
 ExecutionState *ExecutionState::branch() {
   depth++;

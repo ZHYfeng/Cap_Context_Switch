@@ -15,20 +15,31 @@
 #ifndef KLEE_EXECUTOR_H
 #define KLEE_EXECUTOR_H
 
-#include "klee/ExecutionState.h"
-#include "klee/Interpreter.h"
-#include "klee/Internal/Module/Cell.h"
-#include "klee/Internal/Module/KInstruction.h"
-#include "klee/Internal/Module/KModule.h"
-#include "klee/util/ArrayCache.h"
-#include "llvm/Support/raw_ostream.h"
-
-#include "llvm/ADT/Twine.h"
-
-#include <vector>
-#include <string>
+#include <llvm/ADT/Twine.h>
+#include <llvm/IR/GlobalValue.h>
+#include <llvm/Support/raw_ostream.h>
+#include <cassert>
+#include <cstdint>
 #include <map>
 #include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "../../include/klee/Config/Version.h"
+#include "../../include/klee/ExecutionState.h"
+#include "../../include/klee/Expr.h"
+#include "../../include/klee/Internal/ADT/KTest.h"
+#include "../../include/klee/Internal/Module/KInstruction.h"
+#include "../../include/klee/Internal/Module/KModule.h"
+#include "../../include/klee/Interpreter.h"
+#include "../../include/klee/util/ArrayCache.h"
+#include "../../include/klee/util/Ref.h"
+#include "../Thread/StackType.h"
+#include "AddressSpace.h"
+#include "ExecutorTimerInfo.h"
+#include "Memory.h"
+#include "SeedInfo.h"
 
 struct KTest;
 
@@ -41,11 +52,7 @@ namespace llvm {
   class Function;
   class GlobalValue;
   class Instruction;
-#if LLVM_VERSION_CODE <= LLVM_VERSION(3, 1)
-  class TargetData;
-#else
   class DataLayout;
-#endif
   class Twine;
   class Value;
 }
@@ -106,6 +113,10 @@ public:
   };
 
   typedef std::pair<ExecutionState*,ExecutionState*> StatePair;
+
+	enum ExecStatus {
+		SUCCESS, IGNOREDERROR, RUNTIMEERROR
+	};
 
 private:
   class TimerInfo;
@@ -198,6 +209,19 @@ private:
 
   // @brief buffer to store logs before flushing to file
   llvm::raw_string_ostream debugLogBuffer;
+
+	ListenerService* listenerService;
+
+	bool isFinished; // whether the verification is finished
+
+	Prefix* prefix; // prefix used to guide execution
+
+	unsigned executionNum; // total number of execution
+
+	ExecStatus execStatus;
+
+	static bool hasInitialized;
+
 
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
                                     ExecutionState &state);

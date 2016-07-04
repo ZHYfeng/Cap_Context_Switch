@@ -8,100 +8,91 @@
 //===----------------------------------------------------------------------===//
 
 #include "Executor.h"
+
+#include <alloca.h>
+#include <errno.h>
+#include <llvm/ADT/APFloat.h>
+#include <llvm/ADT/APInt.h>
+#include <llvm/ADT/ilist.h>
+#include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringExtras.h>
+#include <llvm/ADT/StringRef.h>
+#include <llvm/DebugInfo.h>
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/DataLayout.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalAlias.h>
+#include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/InlineAsm.h>
+#include <llvm/IR/InstrTypes.h>
+#include <llvm/IR/Instruction.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/User.h>
+#include <llvm/IR/Value.h>
+#include <llvm/Support/CallSite.h>
+#include <llvm/Support/Casting.h>
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Support/ErrorHandling.h>
+#include <llvm/Support/MathExtras.h>
+#include <sys/types.h>
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <iterator>
+#include <sstream>
+
+#include "../../include/klee/CommandLine.h"
+#include "../../include/klee/Common.h"
+#include "../../include/klee/Constraints.h"
+#include "../../include/klee/Internal/ADT/ImmutableMap.h"
+#include "../../include/klee/Internal/ADT/ImmutableTree.h"
+#include "../../include/klee/Internal/ADT/RNG.h"
+#include "../../include/klee/Internal/ADT/TreeStream.h"
+#include "../../include/klee/Internal/Module/Cell.h"
+#include "../../include/klee/Internal/Module/InstructionInfoTable.h"
+#include "../../include/klee/Internal/Module/KInstIterator.h"
+#include "../../include/klee/Internal/Support/ErrorHandling.h"
+#include "../../include/klee/Internal/System/MemoryUsage.h"
+#include "../../include/klee/Internal/System/Time.h"
+#include "../../include/klee/Solver.h"
+#include "../../include/klee/Statistic.h"
+#include "../../include/klee/Statistics.h"
+#include "../../include/klee/TimerStatIncrementer.h"
+#include "../../include/klee/util/Assignment.h"
+#include "../../include/klee/util/ExprPPrinter.h"
+#include "../../include/klee/util/ExprSMTLIBPrinter.h"
+#include "../../include/klee/util/GetElementPtrTypeIterator.h"
+#include "../Encode/Event.h"
+#include "../Encode/ListenerService.h"
+#include "../Encode/Prefix.h"
+#include "../Encode/RuntimeDataManager.h"
+#include "../Encode/Trace.h"
+#include "../Encode/Transfer.h"
+#include "../Thread/MutexManager.h"
+#include "../Thread/StackFrame.h"
+#include "../Thread/Thread.h"
+#include "../Thread/ThreadScheduler.h"
+#include "CallPathManager.h"
 #include "Context.h"
 #include "CoreStats.h"
 #include "ExternalDispatcher.h"
 #include "ImpliedValue.h"
-#include "Memory.h"
 #include "MemoryManager.h"
 #include "PTree.h"
 #include "Searcher.h"
-#include "SeedInfo.h"
 #include "SpecialFunctionHandler.h"
 #include "StatsTracker.h"
 #include "TimingSolver.h"
 #include "UserSearcher.h"
-#include "ExecutorTimerInfo.h"
-
-
-#include "klee/ExecutionState.h"
-#include "klee/Expr.h"
-#include "klee/Interpreter.h"
-#include "klee/TimerStatIncrementer.h"
-#include "klee/CommandLine.h"
-#include "klee/Common.h"
-#include "klee/util/Assignment.h"
-#include "klee/util/ExprPPrinter.h"
-#include "klee/util/ExprSMTLIBPrinter.h"
-#include "klee/util/ExprUtil.h"
-#include "klee/util/GetElementPtrTypeIterator.h"
-#include "klee/Config/Version.h"
-#include "klee/Internal/ADT/KTest.h"
-#include "klee/Internal/ADT/RNG.h"
-#include "klee/Internal/Module/Cell.h"
-#include "klee/Internal/Module/InstructionInfoTable.h"
-#include "klee/Internal/Module/KInstruction.h"
-#include "klee/Internal/Module/KModule.h"
-#include "klee/Internal/Support/ErrorHandling.h"
-#include "klee/Internal/Support/FloatEvaluation.h"
-#include "klee/Internal/System/Time.h"
-#include "klee/Internal/System/MemoryUsage.h"
-#include "klee/SolverStats.h"
-
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Attributes.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/IR/TypeBuilder.h"
-#else
-#include "llvm/Attributes.h"
-#include "llvm/BasicBlock.h"
-#include "llvm/Constants.h"
-#include "llvm/Function.h"
-#include "llvm/Instructions.h"
-#include "llvm/IntrinsicInst.h"
-#include "llvm/LLVMContext.h"
-#include "llvm/Module.h"
-#if LLVM_VERSION_CODE <= LLVM_VERSION(3, 1)
-#include "llvm/Target/TargetData.h"
-#else
-#include "llvm/DataLayout.h"
-#include "llvm/TypeBuilder.h"
-#endif
-#endif
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/Process.h"
-#include "llvm/Support/raw_ostream.h"
-
-#if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
-#include "llvm/Support/CallSite.h"
-#else
-#include "llvm/IR/CallSite.h"
-#endif
-
-#include <cassert>
-#include <algorithm>
-#include <iomanip>
-#include <iosfwd>
-#include <fstream>
-#include <sstream>
-#include <vector>
-#include <string>
-
-#include <sys/mman.h>
-
-#include <errno.h>
-#include <cxxabi.h>
 
 using namespace llvm;
 using namespace klee;
@@ -285,7 +276,7 @@ namespace {
   cl::opt<unsigned>
   MaxMemory("max-memory",
             cl::desc("Refuse to fork when above this amount of memory (in MB, default=2000)"),
-            cl::init(2000));
+            cl::init(8000));
 
   cl::opt<bool>
   MaxMemoryInhibit("max-memory-inhibit",
@@ -299,16 +290,33 @@ namespace klee {
 }
 
 Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
-    : Interpreter(opts), kmodule(0), interpreterHandler(ih), searcher(0),
-      externalDispatcher(new ExternalDispatcher()), statsTracker(0),
-      pathWriter(0), symPathWriter(0), specialFunctionHandler(0),
-      processTree(0), replayKTest(0), replayPath(0), usingSeeds(0),
-      atMemoryLimit(false), inhibitForking(false), haltExecution(false),
-      ivcEnabled(false),
-      coreSolverTimeout(MaxCoreSolverTime != 0 && MaxInstructionTime != 0
-                            ? std::min(MaxCoreSolverTime, MaxInstructionTime)
-                            : std::max(MaxCoreSolverTime, MaxInstructionTime)),
-      debugInstFile(0), debugLogBuffer(debugBufferString) {
+    : 	Interpreter(opts),
+		kmodule(0),
+		interpreterHandler(ih),
+		searcher(0),
+		externalDispatcher(new ExternalDispatcher()),
+		statsTracker(0),
+		pathWriter(0),
+		symPathWriter(0),
+		specialFunctionHandler(0),
+		processTree(0),
+		replayKTest(0),
+		replayPath(0),
+		replayPosition(0),
+		usingSeeds(0),
+		atMemoryLimit(false),
+		inhibitForking(false),
+		haltExecution(false),
+		ivcEnabled(false),
+		coreSolverTimeout(MaxCoreSolverTime != 0 && MaxInstructionTime != 0 ?
+						std::min(MaxCoreSolverTime, MaxInstructionTime) :
+						std::max(MaxCoreSolverTime, MaxInstructionTime)),
+		debugInstFile(0), debugLogBuffer(debugBufferString),
+		isFinished(false),
+		prefix(NULL),
+		executionNum(0),
+		execStatus(SUCCESS),
+		hasInitialized(false) {
 
   if (coreSolverTimeout) UseForkedCoreSolver = true;
   Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse);
@@ -340,6 +348,10 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
         new llvm::raw_fd_ostream(debug_file_name.c_str(), ErrorInfo);
 #endif
   }
+
+  ///@hy
+  listenerService = new ListenerService(this);
+
 }
 
 
@@ -716,7 +728,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
        MaxStaticCPForkPct!=1. || MaxStaticCPSolvePct != 1.) &&
       statsTracker->elapsed() > 60.) {
     StatisticManager &sm = *theStatisticManager;
-    CallPathNode *cpn = current.stack.back().callPathNode;
+    CallPathNode *cpn = current.currentStack->realStack.back().callPathNode;
     if ((MaxStaticForkPct<1. &&
          sm.getIndexedValue(stats::forks, sm.getIndex()) > 
          stats::forks*MaxStaticForkPct) ||
@@ -745,7 +757,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   bool success = solver->evaluate(current, condition, res);
   solver->setTimeout(0);
   if (!success) {
-    current.pc = current.prevPC;
+    current.currentThread->pc = current.currentThread->prevPC;
     terminateStateEarly(current, "Query timed out (fork).");
     return StatePair(0, 0);
   }
@@ -1041,7 +1053,7 @@ const Cell& Executor::eval(KInstruction *ki, unsigned index,
     return kmodule->constantTable[index];
   } else {
     unsigned index = vnumber;
-    StackFrame &sf = state.stack.back();
+    StackFrame &sf = state.currentStack->realStack.back();
     return sf.locals[index];
   }
 }
@@ -1189,7 +1201,7 @@ void Executor::stepInstruction(ExecutionState &state) {
     statsTracker->stepInstruction(state);
 
   ++stats::instructions;
-  state.prevPC = state.currentThread->pc;
+  state.currentThread->prevPC = state.currentThread->pc;
   ++state.currentThread->pc;
 
   if (stats::instructions==StopAfterNInstructions)
@@ -1211,7 +1223,7 @@ void Executor::executeCall(ExecutionState &state,
       // va_arg is handled by caller and intrinsic lowering, see comment for
       // ExecutionState::varargs
     case Intrinsic::vastart:  {
-      StackFrame &sf = state.stack.back();
+      StackFrame &sf = state.currentStack->realStack.back();
       assert(sf.varargs && 
              "vastart called in function with no vararg object");
 
@@ -1268,11 +1280,11 @@ void Executor::executeCall(ExecutionState &state,
     // instead of the actual instruction, since we can't make a KInstIterator
     // from just an instruction (unlike LLVM).
     KFunction *kf = kmodule->functionMap[f];
-    state.pushFrame(state.prevPC, kf);
+    state.currentStack->pushFrame(state.currentThread->prevPC, kf);
     state.currentThread->pc = kf->instructions;
         
     if (statsTracker)
-      statsTracker->framePushed(state, &state.stack[state.stack.size()-2]);
+      statsTracker->framePushed(state, &state.currentStack->realStack[state.currentStack->realStack.size()-2]);
  
      // TODO: support "byval" parameter attribute
      // TODO: support zeroext, signext, sret attributes
@@ -1297,7 +1309,7 @@ void Executor::executeCall(ExecutionState &state,
         return;
       }
             
-      StackFrame &sf = state.stack.back();
+      StackFrame &sf = state.currentStack->realStack.back();
       unsigned size = 0;
       for (unsigned i = funcArgs; i < callingArgs; i++) {
         // FIXME: This is really specific to the architecture, not the pointer
@@ -1318,7 +1330,7 @@ void Executor::executeCall(ExecutionState &state,
       }
 
       MemoryObject *mo = sf.varargs = memory->allocate(size, true, false, 
-                                                       state.prevPC->inst);
+                                                       state.currentThread->prevPC->inst);
       if (!mo) {
         terminateStateOnExecError(state, "out of memory (varargs)");
         return;
@@ -1371,12 +1383,12 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   // instructions know which argument to eval, set the pc, and continue.
   
   // XXX this lookup has to go ?
-  KFunction *kf = state.stack.back().kf;
+  KFunction *kf = state.currentStack->realStack.back().kf;
   unsigned entry = kf->basicBlockEntry[dst];
   state.currentThread->pc = &kf->instructions[entry];
   if (state.currentThread->pc->inst->getOpcode() == Instruction::PHI) {
     PHINode *first = static_cast<PHINode*>(state.currentThread->pc->inst);
-    state.incomingBBIndex = first->getBasicBlockIndex(src);
+    state.currentThread->incomingBBIndex = first->getBasicBlockIndex(src);
   }
 }
 
@@ -1455,7 +1467,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     // Control flow
   case Instruction::Ret: {
     ReturnInst *ri = cast<ReturnInst>(i);
-    KInstIterator kcaller = state.stack.back().caller;
+    KInstIterator kcaller = state.currentStack->realStack.back().caller;
     Instruction *caller = kcaller ? kcaller->inst : 0;
     bool isVoidReturn = (ri->getNumOperands() == 0);
     ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
@@ -1464,7 +1476,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       result = eval(ki, 0, state).value;
     }
     
-    if (state.stack.size() <= 1) {
+    if (state.currentStack->realStack.size() <= 1) {
       assert(!caller && "caller set on initial stack frame");
       terminateStateOnExit(state);
     } else {
@@ -1557,7 +1569,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // requires that we still be in the context of the branch
       // instruction (it reuses its statistic id). Should be cleaned
       // up with convenient instruction specific data.
-      if (statsTracker && state.stack.back().kf->trackCoverage)
+      if (statsTracker && state.currentStack->realStack.back().kf->trackCoverage)
         statsTracker->markBranchVisited(branches.first, branches.second);
 
       if (branches.first)
@@ -1761,7 +1773,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
   case Instruction::PHI: {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
-    ref<Expr> result = eval(ki, state.incomingBBIndex, state).value;
+    ref<Expr> result = eval(ki, state.currentThread->incomingBBIndex, state).value;
 #else
     ref<Expr> result = eval(ki, state.incomingBBIndex * 2, state).value;
 #endif
@@ -2510,12 +2522,17 @@ void Executor::bindInstructionConstants(KInstruction *KI) {
 }
 
 void Executor::bindModuleConstants() {
-  for (std::vector<KFunction*>::iterator it = kmodule->functions.begin(), 
-         ie = kmodule->functions.end(); it != ie; ++it) {
-    KFunction *kf = *it;
-    for (unsigned i=0; i<kf->numInstructions; ++i)
-      bindInstructionConstants(kf->instructions[i]);
-  }
+	// avoid multiple assignment of getElementPtr's indices
+	// add by ylc
+	if (!hasInitialized) {
+		hasInitialized = true;
+		for (std::vector<KFunction*>::iterator it = kmodule->functions.begin(),
+				ie = kmodule->functions.end(); it != ie; ++it) {
+			KFunction *kf = *it;
+			for (unsigned i = 0; i < kf->numInstructions; ++i)
+				bindInstructionConstants(kf->instructions[i]);
+		}
+	}
 
   kmodule->constantTable = new Cell[kmodule->constants.size()];
   for (unsigned i=0; i<kmodule->constants.size(); ++i) {
@@ -2634,18 +2651,136 @@ void Executor::run(ExecutionState &initialState) {
 
   searcher->update(0, states, std::set<ExecutionState*>());
 
-  while (!states.empty() && !haltExecution) {
-    ExecutionState &state = searcher->selectState();
-    KInstruction *ki = state.currentThread->pc;
-    stepInstruction(state);
+	handleInitializers(initialState);
 
-    executeInstruction(state, ki);
-    processTimers(&state, MaxInstructionTime);
+	while (!states.empty() && !haltExecution) {
+		ExecutionState &state = searcher->selectState();
+		Thread* thread = state.getNextThread();
+		bool isAbleToRun = true;
+		switch (thread->threadState) {
+		case Thread::RUNNABLE: {
+			break;
+		}
 
-    checkMemoryUsage();
+		case Thread::MUTEX_BLOCKED: {
+			//TODO:　死锁检测可以完善
+			Thread* origin = thread;
+			bool deadlock = false;
+			do {
+				std::string errorMsg;
+				bool isBlocked;
+				if (state.mutexManager.tryToLockForBlockedThread(thread->threadId,
+						isBlocked, errorMsg)) {
+					if (isBlocked) {
+						if (prefix && !prefix->isFinished()) {
+							std::cerr 	<< "thread" << thread->threadId << ": "
+										<< thread->pc->info->file << "/"
+										<< thread->pc->info->line << " "
+										<< thread->pc->inst->getOpcodeName()
+										<< std::endl;
+							std::cerr	<< "thread state is MUTEX_BLOCKED, try to get lock but failed\n";
+							isAbleToRun = false;
+							break;
+							//assert(0 && "thread state is MUTEX_BLOCKED, try to get lock but failed");
+						}
+						state.reSchedule();
+						thread = state.getNextThread();
+						if (thread == origin) {
+							if (deadlock) {
+								std::cerr << "perhaps deadlock happen\n";
+								isAbleToRun = false;
+								break;
+								//assert(0 && "perhaps deadlock happen");
+							} else {
+								deadlock = true;
+							}
+						}
+					} else {
+						state.switchThreadToRunnable(thread);
+					}
+				} else {
+					std::cerr << errorMsg << std::endl;
+					assert(0 && "try to get lock but failed");
+				}
+			} while (!thread->isRunnable());
 
-    updateStates(&state);
-  }
+			break;
+		}
+
+		default: {
+			isAbleToRun = false;
+		}
+
+		}
+
+		//处理前缀出错以及执行出错
+		if (!isAbleToRun) {
+			//isExecutionSuccess = false;
+			execStatus = RUNTIMEERROR;
+			listenerService->executionFailed(state, state.currentThread->pc);
+			std::cerr << "thread unable to run, Id: " << thread->threadId
+					<< " state: " << thread->threadState << std::endl;
+			terminateState(state);
+			break;
+			//assert(0 && "thread are unable to execute!");
+		}
+//    if (!thread->isRunnable()) {
+//    	if (prefix && !prefix->isFinished()) {
+//    		isExecutionSuccess = false;
+//    		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+//    			(*bit)->executionFailed(state, ki);
+//    		}
+//    		terminateState(state);
+//    		updateStates(&state);
+//    		break;
+//    	} else {
+//    		cerr << "thread id: " << thread->threadId << " state: " << thread->threadState << endl;
+//    		assert(0 && "thread unrunnable");
+//    	}
+//    }
+		KInstruction *ki = thread->pc;
+		if (prefix && !prefix->isFinished() && ki != prefix->getCurrentInst()) {
+			//cerr << "prefix: " << prefix->getCurrentInst() << " " << prefix->getCurrentInst()->inst->getOpcodeName() << " reality: " << ki << " " << ki->inst->getOpcodeName() << endl;
+			std::cerr << "thread id : " << thread->threadId << "\n";
+			ki->inst->print(errs());
+			std::cerr << std::endl;
+			prefix->getCurrentInst()->inst->print(errs());
+			std::cerr << std::endl;
+			std::cerr << "prefix unmatched\n";
+			execStatus = IGNOREDERROR;
+			terminateState(state);
+			break;
+			//assert(0 && "prefix unmatched");
+		}
+		stepInstruction(state);
+
+		listenerService->executeInstruction(state, ki);
+
+		executeInstruction(state, ki);
+
+		listenerService->instructionExecuted(state, ki);
+
+		if (prefix) {
+			prefix->increasePosition();
+		}
+		if (execStatus != SUCCESS) {
+			updateStates(&state);
+			break;
+		}
+		processTimers(&state, MaxInstructionTime);
+
+		if (state.threadScheduler->isSchedulerEmpty()) {
+			if(!state.examineAllThreadFinalState()){
+				execStatus = RUNTIMEERROR;
+			}else {
+				execStatus = SUCCESS;
+			}
+			terminateState(state);
+		}
+
+		checkMemoryUsage();
+		updateStates(&state);
+	}
 
   delete searcher;
   searcher = 0;
@@ -2724,7 +2859,7 @@ void Executor::terminateState(ExecutionState &state) {
 
   std::set<ExecutionState*>::iterator it = addedStates.find(&state);
   if (it==addedStates.end()) {
-    state.currentThread->pc = state.prevPC;
+    state.currentThread->pc = state.currentThread->prevPC;
 
     removedStates.insert(&state);
   } else {
@@ -2759,16 +2894,16 @@ const InstructionInfo & Executor::getLastNonKleeInternalInstruction(const Execut
     Instruction ** lastInstruction) {
   // unroll the stack of the applications state and find
   // the last instruction which is not inside a KLEE internal function
-  ExecutionState::stack_ty::const_reverse_iterator it = state.stack.rbegin(),
-      itE = state.stack.rend();
+  ExecutionState::stack_ty::const_reverse_iterator it = state.currentStack->realStack.rbegin(),
+      itE = state.currentStack->realStack.rend();
 
   // don't check beyond the outermost function (i.e. main())
   itE--;
 
   const InstructionInfo * ii = 0;
   if (kmodule->internalFunctions.count(it->kf->function) == 0){
-    ii =  state.prevPC->info;
-    *lastInstruction = state.prevPC->inst;
+    ii =  state.currentThread->prevPC->info;
+    *lastInstruction = state.currentThread->prevPC->inst;
     //  Cannot return yet because even though
     //  it->function is not an internal function it might of
     //  been called from an internal function.
@@ -2792,8 +2927,8 @@ const InstructionInfo & Executor::getLastNonKleeInternalInstruction(const Execut
 
   if (!ii) {
     // something went wrong, play safe and return the current instruction info
-    *lastInstruction = state.prevPC->inst;
-    return *state.prevPC->info;
+    *lastInstruction = state.currentThread->prevPC->inst;
+    return *state.currentThread->prevPC->info;
   }
   return *ii;
 }
@@ -2974,7 +3109,7 @@ ObjectState *Executor::bindObjectInState(ExecutionState &state,
   // matter because all we use this list for is to unbind the object
   // on function return.
   if (isLocal)
-    state.stack.back().allocas.push_back(mo);
+    state.currentStack->realStack.back().allocas.push_back(mo);
 
   return os;
 }
@@ -2988,7 +3123,7 @@ void Executor::executeAlloc(ExecutionState &state,
   size = toUnique(state, size);
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(size)) {
     MemoryObject *mo = memory->allocate(CE->getZExtValue(), isLocal, false, 
-                                        state.prevPC->inst);
+                                        state.currentThread->prevPC->inst);
     if (!mo) {
       bindLocal(target, state, 
                 ConstantExpr::alloc(0, Context::get().getPointerWidth()));
@@ -3196,7 +3331,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
                                       inBounds);
     solver->setTimeout(0);
     if (!success) {
-      state.currentThread->pc = state.prevPC;
+      state.currentThread->pc = state.currentThread->prevPC;
       terminateStateEarly(state, "Query timed out (bounds check).");
       return;
     }
@@ -3429,7 +3564,7 @@ void Executor::runFunctionAsMain(Function *f,
         char *s = i<argc ? argv[i] : envp[i-(argc+1)];
         int j, len = strlen(s);
         
-        MemoryObject *arg = memory->allocate(len+1, false, true, state->pc->inst);
+        MemoryObject *arg = memory->allocate(len+1, false, true, state->currentThread->pc->inst);
         ObjectState *os = bindObjectInState(*state, arg, false);
         for (j=0; j<len+1; j++)
           os->write8(j, s[j]);
@@ -3682,10 +3817,9 @@ void Executor::printInstrcution(ExecutionState &state, KInstruction* ki) {
 			+ Transfer::uint64toString(listenerService->getRuntimeDataManager()->getCurrentTrace()->Id)
 			+ ".txt";
 	string errorMsg;
-	raw_fd_ostream out(fileName.c_str(), errorMsg, raw_fd_ostream::F_Append);
+	raw_fd_ostream out(fileName.c_str(), errorMsg, sys::fs::F_Append);
 	//ostream& out = cerr;
-	if (prefix && !isPrefixFinished && prefix->isFinished()) {
-		isPrefixFinished = true;
+	if (prefix && prefix->isFinished()) {
 		out << "prefix finished\n";
 	}
 	Instruction* inst = ki->inst;
@@ -3704,35 +3838,35 @@ void Executor::printInstrcution(ExecutionState &state, KInstruction* ki) {
 			Value *fp = cs.getCalledValue();
 			Function *f = getTargetFunction(fp, state);
 			if (!f) {
-				ref<Expr> expr = eval(ki, 0, state.currentStack).value;
+				ref<Expr> expr = eval(ki, 0, state).value;
 				ConstantExpr* constExpr = dyn_cast<ConstantExpr>(expr.get());
 				uint64_t functionPtr = constExpr->getZExtValue();
 				f = (Function*) functionPtr;
 			}
 			out << " " << f->getName().str();
 			if (f->getName().str() == "pthread_mutex_lock") {
-				ref<Expr> param = eval(ki, 1, state.currentStack).value;
+				ref<Expr> param = eval(ki, 1, state).value;
 				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(param);
 				out << " " << cexpr->getZExtValue();
 			} else if (f->getName().str() == "pthread_mutex_unlock") {
-				ref<Expr> param = eval(ki, 1, state.currentStack).value;
+				ref<Expr> param = eval(ki, 1, state).value;
 				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(param);
 				out << " " << cexpr->getZExtValue();
 			} else if (f->getName().str() == "pthread_cond_wait") {
 				//get lock
-				ref<Expr> param = eval(ki, 2, state.currentStack).value;
+				ref<Expr> param = eval(ki, 2, state).value;
 				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(param);
 				out << " " << cexpr->getZExtValue();
 				//get cond
-				param = eval(ki, 1, state.currentStack).value;
+				param = eval(ki, 1, state).value;
 				cexpr = dyn_cast<ConstantExpr>(param);
 				out << " " << cexpr->getZExtValue();
 			} else if (f->getName().str() == "pthread_cond_signal") {
-				ref<Expr> param = eval(ki, 1, state.currentStack).value;
+				ref<Expr> param = eval(ki, 1, state).value;
 				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(param);
 				out << " " << cexpr->getZExtValue();
 			} else if (f->getName().str() == "pthread_cond_broadcast") {
-				ref<Expr> param = eval(ki, 1, state.currentStack).value;
+				ref<Expr> param = eval(ki, 1, state).value;
 				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(param);
 				out << " " << cexpr->getZExtValue();
 			}
@@ -3750,7 +3884,7 @@ void Executor::printInstrcution(ExecutionState &state, KInstruction* ki) {
 	if (prefix && prefix->current() + 1 == prefix->end()) {
 		inst->print(errs());
 		Event* event = *prefix->current();
-		ref<Expr> param = eval(ki, 0, state.currentStack).value;
+		ref<Expr> param = eval(ki, 0, state).value;
 		ConstantExpr* condition = dyn_cast<ConstantExpr>(param);
 		if (condition->getAPValue().getBoolValue() != event->brCondition) {
 			cerr << "\n前缀已被取反\n";
@@ -3765,7 +3899,7 @@ void Executor::printPrefix() {
 		string fileName = prefix->getName() + ".txt";
 		string errorMsg;
 		raw_fd_ostream out(fileName.c_str(), errorMsg,
-				raw_fd_ostream::F_Append);
+				sys::fs::F_Append);
 		prefix->print(out);
 		out.close();
 		//prefix->print(cerr);
