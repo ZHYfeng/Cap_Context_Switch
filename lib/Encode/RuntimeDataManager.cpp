@@ -48,7 +48,7 @@ RuntimeDataManager::~RuntimeDataManager() {
 		delete *ti;
 	}
 	string ErrorInfo;
-	raw_fd_ostream out_to_file("./output_info/statics.txt", ErrorInfo, 0x0202);
+	raw_fd_ostream out_to_file("./output_info/statics.txt", ErrorInfo, sys::fs::F_Append);
 	stringstream ss;
 	ss << "AllFormulaNum:" << allFormulaNum << "\n";
 	ss << "SovingTimes:" << solvingTimes << "\n";

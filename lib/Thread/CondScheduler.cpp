@@ -7,10 +7,10 @@
 
 #include "CondScheduler.h"
 
+#include "../Encode/Event.h"
+
 #include <stddef.h>
 #include <iterator>
-
-#include "../Encode/Event.h"
 
 using namespace::std;
 

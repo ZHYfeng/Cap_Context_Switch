@@ -8,10 +8,7 @@
 #ifndef BITCODELISTENER_H_
 #define BITCODELISTENER_H_
 
-#include <map>
-
 #include "klee/ExecutionState.h"
-#include "klee/Internal/Module/KInstruction.h"
 
 namespace klee {
 

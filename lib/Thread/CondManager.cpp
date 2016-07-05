@@ -10,9 +10,10 @@
 #include <iterator>
 #include <utility>
 
+#include "../Encode/Transfer.h"
 #include "CondScheduler.h"
 #include "Mutex.h"
-#include "Transfer.h"
+#include "MutexManager.h"
 #include "WaitParam.h"
 
 using namespace::std;

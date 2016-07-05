@@ -8,64 +8,59 @@
 #ifndef LIB_CORE_TAINTLISTENER_H_
 #define LIB_CORE_TAINTLISTENER_H_
 
-#include <map>
-#include <string>
-#include <vector>
-
-#include "../../include/klee/ExecutionState.h"
-#include "../../include/klee/Expr.h"
-#include "../../include/klee/util/Ref.h"
+#include "klee/ExecutionState.h"
+#include "klee/Expr.h"
+#include "klee/util/Ref.h"
 #include "../Core/AddressSpace.h"
 #include "../Thread/StackType.h"
 #include "BitcodeListener.h"
 #include "Event.h"
 #include "FilterSymbolicExpr.h"
+#include "../Encode/RuntimeDataManager.h"
 
-namespace klee {
-class RuntimeDataManager;
-} /* namespace klee */
+#include <map>
+#include <string>
+#include <vector>
 
 namespace llvm {
-class Type;
-class Constant;
+	class Type;
+	class Constant;
 }
 
 namespace klee {
 
-class TaintListener: public BitcodeListener {
-public:
-	TaintListener(Executor* executor, RuntimeDataManager* rdManager);
-	~TaintListener();
+	class TaintListener: public BitcodeListener {
+		public:
+			TaintListener(Executor* executor, RuntimeDataManager* rdManager);
+			~TaintListener();
 
-	void beforeRunMethodAsMain(ExecutionState &initialState);
-	void executeInstruction(ExecutionState &state, KInstruction *ki);
-	void instructionExecuted(ExecutionState &state, KInstruction *ki);
-	void afterRunMethodAsMain();
-	void createThread(ExecutionState &state, Thread* thread);
-	void executionFailed(ExecutionState &state, KInstruction *ki);
+			void beforeRunMethodAsMain(ExecutionState &initialState);
+			void executeInstruction(ExecutionState &state, KInstruction *ki);
+			void instructionExecuted(ExecutionState &state, KInstruction *ki);
+			void afterRunMethodAsMain();
+			void createThread(ExecutionState &state, Thread* thread);
+			void executionFailed(ExecutionState &state, KInstruction *ki);
 
-private:
-	Executor* executor;
-	RuntimeDataManager* runtimeData;
-	FilterSymbolicExpr filter;
-	std::vector<Event*>::iterator currentEvent, endEvent;
-	//此Map更新有两处，Load、某些函数。
-	std::map<ref<Expr>, ref<Expr> > addressSymbolicMap;
-	std::map<std::string, ref<Expr> > symbolicMap;
-	AddressSpace addressSpace;
-	std::map<unsigned, StackType *> stack;
+		private:
+			Executor* executor;
+			RuntimeDataManager* runtimeData;
+			FilterSymbolicExpr filter;
+			std::vector<Event*>::iterator currentEvent, endEvent;
+			//此Map更新有两处，Load、某些函数。
+			std::map<ref<Expr>, ref<Expr> > addressSymbolicMap;
+			std::map<std::string, ref<Expr> > symbolicMap;
+			AddressSpace addressSpace;
+			std::map<unsigned, StackType *> stack;
 
-private:
+		private:
 
-	//add by hy
-	ref<Expr> manualMakeTaintSymbolic(ExecutionState& state, std::string name, unsigned size);
-	void manualMakeTaint(ref<Expr> value, bool isTaint);
-	ref<Expr> readExpr(ExecutionState &state, ref<Expr> address, Expr::Width size);
+			//add by hy
+			ref<Expr> manualMakeTaintSymbolic(ExecutionState& state, std::string name, unsigned size);
+			void manualMakeTaint(ref<Expr> value, bool isTaint);
+			ref<Expr> readExpr(ExecutionState &state, ref<Expr> address, Expr::Width size);
 
-};
+	};
 
 }
-
-
 
 #endif /* LIB_CORE_TAINTLISTENER_H_ */

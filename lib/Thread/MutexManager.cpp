@@ -6,9 +6,9 @@
  */
 
 #include "MutexManager.h"
-#include "Transfer.h"
 
-#include <iostream>
+
+#include "../Encode/Transfer.h"
 
 using namespace::std;
 

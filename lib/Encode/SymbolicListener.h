@@ -8,22 +8,20 @@
 #ifndef LIB_CORE_SYMBOLICLISTENER_H_
 #define LIB_CORE_SYMBOLICLISTENER_H_
 
-#include <map>
-#include <string>
-#include <vector>
-
-#include "../../include/klee/ExecutionState.h"
-#include "../../include/klee/Expr.h"
-#include "../../include/klee/util/Ref.h"
+#include "klee/ExecutionState.h"
+#include "klee/Expr.h"
+#include "klee/util/Ref.h"
 #include "../Core/AddressSpace.h"
 #include "../Thread/StackType.h"
 #include "BitcodeListener.h"
 #include "Event.h"
 #include "FilterSymbolicExpr.h"
+#include "../Encode/RuntimeDataManager.h"
+#include "../Core/Executor.h"
 
-namespace klee {
-class RuntimeDataManager;
-} /* namespace klee */
+#include <map>
+#include <string>
+#include <vector>
 
 namespace llvm {
 	class Type;

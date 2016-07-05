@@ -9,48 +9,7 @@
 
 #include "Executor.h"
 
-#include <alloca.h>
-#include <errno.h>
-#include <llvm/ADT/APFloat.h>
-#include <llvm/ADT/APInt.h>
-#include <llvm/ADT/ilist.h>
-#include <llvm/ADT/SmallPtrSet.h>
-#include <llvm/ADT/SmallVector.h>
-#include <llvm/ADT/StringExtras.h>
-#include <llvm/ADT/StringRef.h>
-#include <llvm/DebugInfo.h>
-#include <llvm/IR/Attributes.h>
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/GlobalAlias.h>
-#include <llvm/IR/GlobalVariable.h>
-#include <llvm/IR/InlineAsm.h>
-#include <llvm/IR/InstrTypes.h>
-#include <llvm/IR/Instruction.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/Intrinsics.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/User.h>
-#include <llvm/IR/Value.h>
-#include <llvm/Support/CallSite.h>
-#include <llvm/Support/Casting.h>
-#include <llvm/Support/CommandLine.h>
-#include <llvm/Support/ErrorHandling.h>
-#include <llvm/Support/FileSystem.h>
-#include <llvm/Support/MathExtras.h>
-#include <sys/types.h>
-#include <algorithm>
-#include <cctype>
-#include <cstdlib>
-#include <cstring>
-#include <iostream>
-#include <iterator>
-#include <sstream>
-
+#include "../Encode/ListenerService.h"
 #include "klee/CommandLine.h"
 #include "klee/Common.h"
 #include "klee/Constraints.h"
@@ -95,6 +54,49 @@
 #include "StatsTracker.h"
 #include "TimingSolver.h"
 #include "UserSearcher.h"
+
+#include <llvm/ADT/APFloat.h>
+#include <llvm/ADT/APInt.h>
+#include <llvm/ADT/ilist.h>
+#include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringExtras.h>
+#include <llvm/ADT/StringRef.h>
+#include <llvm/DebugInfo.h>
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/DataLayout.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalAlias.h>
+#include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/InlineAsm.h>
+#include <llvm/IR/InstrTypes.h>
+#include <llvm/IR/Instruction.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/User.h>
+#include <llvm/IR/Value.h>
+#include <llvm/Support/CallSite.h>
+#include <llvm/Support/Casting.h>
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Support/ErrorHandling.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/MathExtras.h>
+
+#include <sys/types.h>
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <iterator>
+#include <sstream>
+#include <alloca.h>
+#include <errno.h>
 
 using namespace llvm;
 using namespace klee;
@@ -863,6 +865,24 @@ const Cell& Executor::eval(KInstruction *ki, unsigned index, ExecutionState &sta
 		return sf.locals[index];
 	}
 }
+
+void Executor::ineval(KInstruction *ki, unsigned index, ExecutionState &state, ref<Expr> value) const {
+	assert(index < ki->inst->getNumOperands());
+	int vnumber = ki->operands[index];
+
+	assert(vnumber != -1 && "Invalid operand to eval(), not a value or constant!");
+
+	// Determine if this is a constant or not.
+	if (vnumber < 0) {
+		unsigned index = -vnumber - 2;
+		kmodule->constantTable[index].value = value;
+	} else {
+		unsigned index = vnumber;
+		StackFrame &sf = state.currentStack->realStack.back();
+		sf.locals[index].value = value;
+	}
+}
+
 
 void Executor::bindLocal(KInstruction *target, ExecutionState &state, ref<Expr> value) {
 	getDestCell(state, target).value = value;

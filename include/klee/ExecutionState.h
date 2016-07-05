@@ -10,12 +10,6 @@
 #ifndef KLEE_EXECUTIONSTATE_H
 #define KLEE_EXECUTIONSTATE_H
 
-#include <map>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "../../lib/Core/AddressSpace.h"
 #include "../../lib/Core/Memory.h"
 #include "../../lib/Thread/BarrierManager.h"
@@ -28,160 +22,162 @@
 #include "Internal/ADT/TreeStream.h"
 #include "util/Ref.h"
 
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
 namespace klee {
-class ThreadScheduler;
+	class ThreadScheduler;
 } /* namespace klee */
 
 namespace klee {
-class Array;
-class CallPathNode;
-struct Cell;
-struct KFunction;
-struct KInstruction;
-class MemoryObject;
-class PTreeNode;
-struct InstructionInfo;
+	class Array;
+	class CallPathNode;
+	struct Cell;
+	struct KFunction;
+	struct KInstruction;
+	class MemoryObject;
+	class PTreeNode;
+	struct InstructionInfo;
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const MemoryMap &mm);
+	llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const MemoryMap &mm);
 
 /// @brief ExecutionState representing a path under exploration
-class ExecutionState {
-public:
-	typedef std::vector<StackFrame> stack_ty;
+	class ExecutionState {
+		public:
+			typedef std::vector<StackFrame> stack_ty;
 
-private:
-	// unsupported, use copy constructor
-	ExecutionState &operator=(const ExecutionState &);
+		private:
+			// unsupported, use copy constructor
+			ExecutionState &operator=(const ExecutionState &);
 
-	std::map<std::string, std::string> fnAliases;
+			std::map<std::string, std::string> fnAliases;
 
-public:
-	// Execution - Control Flow specific
+		public:
+			// Execution - Control Flow specific
 
-	/// @brief Address space used by this state (e.g. Global and Heap)
-	AddressSpace addressSpace;
+			/// @brief Address space used by this state (e.g. Global and Heap)
+			AddressSpace addressSpace;
 
-	/// @brief Constraints collected so far
-	ConstraintManager constraints;
+			/// @brief Constraints collected so far
+			ConstraintManager constraints;
 
-	/// Statistics and information
+			/// Statistics and information
 
-	/// @brief Costs for all queries issued for this state, in seconds
-	mutable double queryCost;
+			/// @brief Costs for all queries issued for this state, in seconds
+			mutable double queryCost;
 
-	/// @brief Weight assigned for importance of this state.  Can be
-	/// used for searchers to decide what paths to explore
-	double weight;
+			/// @brief Weight assigned for importance of this state.  Can be
+			/// used for searchers to decide what paths to explore
+			double weight;
 
-	/// @brief Exploration depth, i.e., number of times KLEE branched for this state
-	unsigned depth;
+			/// @brief Exploration depth, i.e., number of times KLEE branched for this state
+			unsigned depth;
 
-	/// @brief History of complete path: represents branches taken to
-	/// reach/create this state (both concrete and symbolic)
-	TreeOStream pathOS;
+			/// @brief History of complete path: represents branches taken to
+			/// reach/create this state (both concrete and symbolic)
+			TreeOStream pathOS;
 
-	/// @brief History of symbolic path: represents symbolic branches
-	/// taken to reach/create this state
-	TreeOStream symPathOS;
+			/// @brief History of symbolic path: represents symbolic branches
+			/// taken to reach/create this state
+			TreeOStream symPathOS;
 
-	/// @brief Counts how many instructions were executed since the last new
-	/// instruction was covered.
-	unsigned instsSinceCovNew;
+			/// @brief Counts how many instructions were executed since the last new
+			/// instruction was covered.
+			unsigned instsSinceCovNew;
 
-	/// @brief Whether a new instruction was covered in this state
-	bool coveredNew;
+			/// @brief Whether a new instruction was covered in this state
+			bool coveredNew;
 
-	/// @brief Disables forking for this state. Set by user code
-	bool forkDisabled;
+			/// @brief Disables forking for this state. Set by user code
+			bool forkDisabled;
 
-	/// @brief Set containing which lines in which files are covered by this state
-	std::map<const std::string *, std::set<unsigned> > coveredLines;
+			/// @brief Set containing which lines in which files are covered by this state
+			std::map<const std::string *, std::set<unsigned> > coveredLines;
 
-	/// @brief Pointer to the process tree of the current state
-	PTreeNode *ptreeNode;
+			/// @brief Pointer to the process tree of the current state
+			PTreeNode *ptreeNode;
 
-	/// @brief Ordered list of symbolics: used to generate test cases.
-	//
-	// FIXME: Move to a shared list structure (not critical).
-	std::vector<std::pair<const MemoryObject *, const Array *> > symbolics;
+			/// @brief Ordered list of symbolics: used to generate test cases.
+			//
+			// FIXME: Move to a shared list structure (not critical).
+			std::vector<std::pair<const MemoryObject *, const Array *> > symbolics;
 
-	/// @brief Set of used array names for this state.  Used to avoid collisions.
-	std::set<std::string> arrayNames;
+			/// @brief Set of used array names for this state.  Used to avoid collisions.
+			std::set<std::string> arrayNames;
 
+			std::string getFnAlias(std::string fn);
+			void addFnAlias(std::string old_fn, std::string new_fn);
+			void removeFnAlias(std::string fn);
 
+			/// @zhy use for multiple stack, this points to current stack, maybe from thread or listener.
+			StackType *currentStack;
 
-	std::string getFnAlias(std::string fn);
-	void addFnAlias(std::string old_fn, std::string new_fn);
-	void removeFnAlias(std::string fn);
+			unsigned nextThreadId;
+			ThreadScheduler* threadScheduler;
+			ThreadList threadList;
+			Thread* currentThread;
 
-	/// @zhy use for multiple stack, this points to current stack, maybe from thread or listener.
-	StackType *currentStack;
+			MutexManager mutexManager;
+			CondManager condManager;
+			BarrierManager barrierManager;
+			std::map<unsigned, std::vector<unsigned> > joinRecord;
 
-	unsigned nextThreadId;
-	ThreadScheduler* threadScheduler;
-	ThreadList threadList;
-	Thread* currentThread;
+		public:
+			ExecutionState(KFunction *kf);
 
-	MutexManager mutexManager;
-	CondManager condManager;
-	BarrierManager barrierManager;
-	std::map<unsigned, std::vector<unsigned> > joinRecord;
+			ExecutionState(KFunction *kf, Prefix* prefix);
 
-public:
-	ExecutionState(KFunction *kf);
+			// XXX total hack, just used to make a state so solver can
+			// use on structure
+			ExecutionState(const std::vector<ref<Expr> > &assumptions);
 
-	ExecutionState(KFunction *kf, Prefix* prefix);
+			ExecutionState(const ExecutionState &state);
 
-	// XXX total hack, just used to make a state so solver can
-	// use on structure
-	ExecutionState(const std::vector<ref<Expr> > &assumptions);
+			~ExecutionState();
 
-	ExecutionState(const ExecutionState &state);
+			ExecutionState *branch();
 
-	~ExecutionState();
+			void addSymbolic(const MemoryObject *mo, const Array *array);
+			void addConstraint(ref<Expr> e) {
+				constraints.addConstraint(e);
+			}
+			bool merge(const ExecutionState &b);
 
-	ExecutionState *branch();
+			Thread* findThreadById(unsigned threadId);
 
-	void addSymbolic(const MemoryObject *mo, const Array *array);
-	void addConstraint(ref<Expr> e) {
-		constraints.addConstraint(e);
-	}
-	bool merge(const ExecutionState &b);
+			Thread* getNextThread();
 
-	Thread* findThreadById(unsigned threadId);
+			Thread* getCurrentThread();
 
-	Thread* getNextThread();
+			bool examineAllThreadFinalState();
 
-	Thread* getCurrentThread();
+			unsigned getNextThreadId();
 
-	bool examineAllThreadFinalState();
+			Thread* createThread(KFunction *kf);
 
-	unsigned getNextThreadId();
+			Thread* createThread(KFunction *kf, unsigned threadId);
 
-	Thread* createThread(KFunction *kf);
+			void swapOutThread(Thread* thread, bool isCondBlocked, bool isBarrierBlocked, bool isJoinBlocked, bool isTerminated);
 
-	Thread* createThread(KFunction *kf, unsigned threadId);
+			void swapInThread(Thread* thread, bool isRunnable, bool isMutexBlocked);
 
-	void swapOutThread(Thread* thread, bool isCondBlocked,
-			bool isBarrierBlocked, bool isJoinBlocked, bool isTerminated);
+			void swapOutThread(unsigned threadId, bool isCondBlocked, bool isBarrierBlocked, bool isJoinBlocked, bool isTerminated);
 
-	void swapInThread(Thread* thread, bool isRunnable, bool isMutexBlocked);
+			void swapInThread(unsigned threadId, bool isRunnable, bool isMutexBlocked);
 
-	void swapOutThread(unsigned threadId, bool isCondBlocked,
-			bool isBarrierBlocked, bool isJoinBlocked, bool isTerminated);
+			void switchThreadToMutexBlocked(Thread* thread);
 
-	void swapInThread(unsigned threadId, bool isRunnable, bool isMutexBlocked);
+			void switchThreadToMutexBlocked(unsigned threadId);
 
-	void switchThreadToMutexBlocked(Thread* thread);
+			void switchThreadToRunnable(Thread* thread);
 
-	void switchThreadToMutexBlocked(unsigned threadId);
+			void switchThreadToRunnable(unsigned threadId);
 
-	void switchThreadToRunnable(Thread* thread);
-
-	void switchThreadToRunnable(unsigned threadId);
-
-	void reSchedule();
-};
+			void reSchedule();
+	};
 }
 
 #endif

@@ -11,28 +11,26 @@
 #include <iostream>
 #include <vector>
 
-#include "../../include/klee/Internal/Module/KInstIterator.h"
+#include "klee/Internal/Module/KInstIterator.h"
 #include "StackFrame.h"
+#include "../Core/AddressSpace.h"
+#include "klee/Internal/Module/KModule.h"
 
 namespace klee {
-struct KFunction;
-} /* namespace klee */
 
-namespace klee {
+	class StackType {
+		public:
+			StackType(AddressSpace *addressSpace);
+			virtual ~StackType();
 
-class StackType {
-public:
-	StackType(AddressSpace *addressSpace);
-	virtual ~StackType();
+			void pushFrame(KInstIterator caller, KFunction *kf);
+			void popFrame();
+			void dumpStack(llvm::raw_ostream &out, KInstIterator prevPC) const;
 
-	void pushFrame(KInstIterator caller, KFunction *kf);
-	void popFrame();
-	void dumpStack(llvm::raw_ostream &out, KInstIterator prevPC) const;
-
-public:
-	std::vector<StackFrame> realStack;
-	AddressSpace *addressSpace;
-};
+		public:
+			std::vector<StackFrame> realStack;
+			AddressSpace *addressSpace;
+	};
 
 } /* namespace klee */
 

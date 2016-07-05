@@ -9,6 +9,6 @@
 
 LEVEL=..
 
-PARALLEL_DIRS=Basic Support Expr Solver Module Core Encode Thread
+PARALLEL_DIRS=Basic Support Expr Solver Module Thread Encode Core
 
 include $(LEVEL)/Makefile.common

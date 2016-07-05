@@ -46,6 +46,7 @@
 #define BUFFERSIZE 300
 #define BIT_WIDTH 64
 #define POINT_BIT_WIDTH 64
+
 #define INT_ARITHMETIC 0
 
 

@@ -186,6 +186,9 @@ public:
   /// contents.
   ObjectState(const MemoryObject *mo, const Array *array);
 
+  //@hy
+  ObjectState(unsigned size, const Array *array);
+
   ObjectState(const ObjectState &os);
   ~ObjectState();
 

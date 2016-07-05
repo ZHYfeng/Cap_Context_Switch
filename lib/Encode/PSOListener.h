@@ -20,10 +20,13 @@
 #include "../Thread/BarrierInfo.h"
 #include "../Thread/StackType.h"
 #include "BitcodeListener.h"
+#include "../Core/Executor.h"
+#include "../Encode/RuntimeDataManager.h"
 
 namespace klee {
 class RuntimeDataManager;
 } /* namespace klee */
+
 namespace llvm {
 class Constant;
 class ConstantExpr;

@@ -10,51 +10,53 @@
 
 #include <vector>
 
-#include "klee/ExecutionState.h"
+#include "../../include/klee/ExecutionState.h"
 #include "BitcodeListener.h"
 #include "RuntimeDataManager.h"
-#include "Encode.h"
-#include "DTAM.h"
+
+namespace klee {
+	class DTAM;
+	class Encode;
+} /* namespace klee */
 
 namespace klee {
 
-class ListenerService {
+	class ListenerService {
 
-private:
-	std::vector<BitcodeListener*> bitcodeListeners;
-	RuntimeDataManager rdManager;
-	Encode *encode;
-	DTAM *dtam;
-	unsigned runState;
-	struct timeval start, finish;
-	double cost;
+		private:
+			std::vector<BitcodeListener*> bitcodeListeners;
+			RuntimeDataManager rdManager;
+			Encode *encode;
+			DTAM *dtam;
+			unsigned runState;
+			struct timeval start, finish;
+			double cost;
 
+		public:
+			ListenerService(Executor* executor);
+			~ListenerService() {
+			}
+			void pushListener(BitcodeListener* bitcodeListener);
+			void removeListener(BitcodeListener* bitcodeListener);
+			void popListener();
 
-public:
-	ListenerService(Executor* executor);
-	~ListenerService(){
-	}
-	void pushListener(BitcodeListener* bitcodeListener);
-	void removeListener(BitcodeListener* bitcodeListener);
-	void popListener();
+			RuntimeDataManager* getRuntimeDataManager();
 
-	RuntimeDataManager* getRuntimeDataManager();
+			void Preparation();
+			void beforeRunMethodAsMain(ExecutionState &initialState);
+			void executeInstruction(ExecutionState &state, KInstruction *ki);
+			void instructionExecuted(ExecutionState &state, KInstruction *ki);
+			void afterRunMethodAsMain();
+			void executionFailed(ExecutionState &state, KInstruction *ki);
 
-	void Preparation();
-	void beforeRunMethodAsMain(ExecutionState &initialState);
-	void executeInstruction(ExecutionState &state, KInstruction *ki);
-	void instructionExecuted(ExecutionState &state, KInstruction *ki);
-	void afterRunMethodAsMain();
-	void executionFailed(ExecutionState &state, KInstruction *ki);
+//			void createMutex(ExecutionState &state, Mutex* mutex);
+//			void createCondition(ExecutionState &state, Condition* condition);
+			void createThread(ExecutionState &state, Thread* thread);
 
-//	void createMutex(ExecutionState &state, Mutex* mutex);
-//	void createCondition(ExecutionState &state, Condition* condition);
-	void createThread(ExecutionState &state, Thread* thread);
+			void startControl(Executor* executor);
+			void endControl(Executor* executor);
 
-	void startControl(Executor* executor);
-	void endControl(Executor* executor);
-
-};
+	};
 
 }
 
