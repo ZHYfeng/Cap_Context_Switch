@@ -63,8 +63,8 @@ ExecutionState::ExecutionState(KFunction *kf)
 
 	condManager.setMutexManager(&mutexManager);
 	threadScheduler = getThreadSchedulerByType(ThreadScheduler::FIFS);
-	Thread* thread = new Thread(getNextThreadId(), NULL, kf);
-	currentStack = &(thread->stack);
+	Thread* thread = new Thread(getNextThreadId(), NULL, kf, &addressSpace);
+	currentStack = thread->stack;
 	threadList.addThread(thread);
 	threadScheduler->addItem(thread);
 	currentThread = thread;
@@ -85,8 +85,8 @@ ExecutionState::ExecutionState(KFunction *kf, Prefix* prefix)
 
 	condManager.setMutexManager(&mutexManager);
 	threadScheduler = new GuidedThreadScheduler(this, ThreadScheduler::FIFS, prefix);
-	Thread* thread = new Thread(getNextThreadId(), NULL, kf);
-	currentStack = &(thread->stack);
+	Thread* thread = new Thread(getNextThreadId(), NULL, kf, &addressSpace);
+	currentStack = thread->stack;
 	threadList.addThread(thread);
 	threadScheduler->addItem(thread);
 	currentThread = thread;
@@ -137,7 +137,7 @@ ExecutionState::ExecutionState(const ExecutionState& state)
     symbolics[i].first->refCount++;
 
   for (ThreadList::iterator ti = state.threadList.begin(), te = state.threadList.end(); ti != te; ti++) {
-	  Thread* thread = new Thread(**ti);
+	  Thread* thread = new Thread(**ti, &addressSpace);
 	  threadList.addThread(thread);
   }
   currentThread = findThreadById(state.currentThread->threadId);
@@ -413,7 +413,7 @@ unsigned ExecutionState::getNextThreadId() {
 }
 
 Thread* ExecutionState::createThread(KFunction *kf) {
-	Thread* newThread = new Thread(getNextThreadId(), currentThread, kf);
+	Thread* newThread = new Thread(getNextThreadId(), currentThread, kf, &addressSpace);
 	threadList.addThread(newThread);
 	threadScheduler->addItem(newThread);
 	return newThread;
@@ -424,7 +424,7 @@ Thread* ExecutionState::createThread(KFunction *kf, unsigned threadId) {
 		nextThreadId = threadId + 1;
 		assert (nextThreadId <= 6 && "vector clock 只有5个");
 	}
-	Thread* newThread = new Thread(threadId, currentThread, kf);
+	Thread* newThread = new Thread(threadId, currentThread, kf, &addressSpace);
 	threadList.addThread(newThread);
 	threadScheduler->addItem(newThread);
 	return newThread;

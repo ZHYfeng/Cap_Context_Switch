@@ -27,10 +27,9 @@ class BitcodeListener {
 
 		virtual ~BitcodeListener();
 		virtual void beforeRunMethodAsMain(ExecutionState &initialState) = 0;
-		virtual void executeInstruction(ExecutionState &state, KInstruction *ki) = 0;
-		virtual void instructionExecuted(ExecutionState &state, KInstruction *ki) = 0;
+		virtual void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki) = 0;
+		virtual void afterExecuteInstruction(ExecutionState &state, KInstruction *ki) = 0;
 		virtual void afterRunMethodAsMain() = 0;
-		virtual void createThread(ExecutionState &state, Thread* thread) = 0;
 		virtual void executionFailed(ExecutionState &state, KInstruction *ki) = 0;
 
 };

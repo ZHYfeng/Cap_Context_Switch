@@ -29,7 +29,13 @@ namespace klee {
 
 	StackType::StackType(AddressSpace *addressSpace) :
 			addressSpace(addressSpace) {
+	}
 
+	StackType::StackType(AddressSpace *addressSpace, StackType *stack) :
+			addressSpace(addressSpace) {
+		for (std::vector<StackFrame>::iterator ie = stack->realStack.begin(), ee = stack->realStack.end(); ie != ee; ie++) {
+			realStack.push_back(*ie);
+		}
 	}
 
 	StackType::~StackType() {

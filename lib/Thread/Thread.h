@@ -27,12 +27,13 @@ namespace klee {
 			unsigned threadId;
 			Thread* parentThread;
 			ThreadState threadState;
-			StackType stack;
+			AddressSpace *addressSpace;
+			StackType *stack;
 			std::vector<unsigned> vectorClock;
 
 		public:
-			Thread(unsigned threadId, Thread* parentThread, KFunction* kf);
-			Thread(Thread& anotherThread);
+			Thread(unsigned threadId, Thread* parentThread, KFunction* kf, AddressSpace *addressSpace);
+			Thread(Thread& anotherThread, AddressSpace *addressSpace);
 			virtual ~Thread();
 
 			bool isRunnable() {

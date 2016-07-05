@@ -102,104 +102,124 @@ using namespace llvm;
 using namespace klee;
 
 namespace {
-cl::opt<bool> DumpStatesOnHalt("dump-states-on-halt", cl::init(true), cl::desc("Dump test cases for all active states on exit (default=on)"));
+	cl::opt<bool> DumpStatesOnHalt("dump-states-on-halt", cl::init(true),
+			cl::desc("Dump test cases for all active states on exit (default=on)"));
 
-cl::opt<bool> RandomizeFork("randomize-fork", cl::init(false), cl::desc("Randomly swap the true and false states on a fork (default=off)"));
+	cl::opt<bool> RandomizeFork("randomize-fork", cl::init(false),
+			cl::desc("Randomly swap the true and false states on a fork (default=off)"));
 
-cl::opt<bool> AllowExternalSymCalls("allow-external-sym-calls", cl::init(false),
-		cl::desc("Allow calls with symbolic arguments to external functions.  This concretizes the symbolic arguments.  (default=off)"));
+	cl::opt<bool> AllowExternalSymCalls("allow-external-sym-calls", cl::init(false),
+			cl::desc(
+					"Allow calls with symbolic arguments to external functions.  This concretizes the symbolic arguments.  (default=off)"));
 
 /// The different query logging solvers that can switched on/off
-enum PrintDebugInstructionsType {
-	STDERR_ALL, ///
-	STDERR_SRC,
-	STDERR_COMPACT,
-	FILE_ALL,    ///
-	FILE_SRC,    ///
-	FILE_COMPACT ///
-};
+	enum PrintDebugInstructionsType {
+		STDERR_ALL, ///
+		STDERR_SRC,
+		STDERR_COMPACT,
+		FILE_ALL,    ///
+		FILE_SRC,    ///
+		FILE_COMPACT ///
+	};
 
-llvm::cl::list<PrintDebugInstructionsType> DebugPrintInstructions("debug-print-instructions", llvm::cl::desc("Log instructions during execution."),
-		llvm::cl::values(clEnumValN(STDERR_ALL, "all:stderr", "Log all instructions to stderr "
-				"in format [src, inst_id, "
-				"llvm_inst]"), clEnumValN(STDERR_SRC, "src:stderr", "Log all instructions to stderr in format [src, inst_id]"),
-				clEnumValN(STDERR_COMPACT, "compact:stderr", "Log all instructions to stderr in format [inst_id]"), clEnumValN(FILE_ALL, "all:file", "Log all instructions to file "
-						"instructions.txt in format [src, "
-						"inst_id, llvm_inst]"), clEnumValN(FILE_SRC, "src:file", "Log all instructions to file "
-						"instructions.txt in format [src, "
-						"inst_id]"), clEnumValN(FILE_COMPACT, "compact:file", "Log all instructions to file instructions.txt in format "
-						"[inst_id]"),
-				clEnumValEnd), llvm::cl::CommaSeparated);
+	llvm::cl::list<PrintDebugInstructionsType> DebugPrintInstructions("debug-print-instructions",
+			llvm::cl::desc("Log instructions during execution."),
+			llvm::cl::values(clEnumValN(STDERR_ALL, "all:stderr", "Log all instructions to stderr "
+					"in format [src, inst_id, "
+					"llvm_inst]"), clEnumValN(STDERR_SRC, "src:stderr", "Log all instructions to stderr in format [src, inst_id]"),
+					clEnumValN(STDERR_COMPACT, "compact:stderr", "Log all instructions to stderr in format [inst_id]"),
+					clEnumValN(FILE_ALL, "all:file", "Log all instructions to file "
+							"instructions.txt in format [src, "
+							"inst_id, llvm_inst]"), clEnumValN(FILE_SRC, "src:file", "Log all instructions to file "
+							"instructions.txt in format [src, "
+							"inst_id]"), clEnumValN(FILE_COMPACT, "compact:file", "Log all instructions to file instructions.txt in format "
+							"[inst_id]"),
+					clEnumValEnd), llvm::cl::CommaSeparated);
 
-cl::opt<bool> DebugCheckForImpliedValues("debug-check-for-implied-values");
+	cl::opt<bool> DebugCheckForImpliedValues("debug-check-for-implied-values");
 
-cl::opt<bool> SimplifySymIndices("simplify-sym-indices", cl::init(false), cl::desc("Simplify symbolic accesses using equalities from other constraints (default=off)"));
+	cl::opt<bool> SimplifySymIndices("simplify-sym-indices", cl::init(false),
+			cl::desc("Simplify symbolic accesses using equalities from other constraints (default=off)"));
 
-cl::opt<bool> EqualitySubstitution("equality-substitution", cl::init(true), cl::desc("Simplify equality expressions before querying the solver (default=on)."));
+	cl::opt<bool> EqualitySubstitution("equality-substitution", cl::init(true),
+			cl::desc("Simplify equality expressions before querying the solver (default=on)."));
 
-cl::opt<unsigned> MaxSymArraySize("max-sym-array-size", cl::init(0));
+	cl::opt<unsigned> MaxSymArraySize("max-sym-array-size", cl::init(0));
 
-cl::opt<bool> SuppressExternalWarnings("suppress-external-warnings", cl::init(false), cl::desc("Supress warnings about calling external functions."));
+	cl::opt<bool> SuppressExternalWarnings("suppress-external-warnings", cl::init(false),
+			cl::desc("Supress warnings about calling external functions."));
 
-cl::opt<bool> AllExternalWarnings("all-external-warnings", cl::init(false), cl::desc("Issue an warning everytime an external call is made,"
-		"as opposed to once per function (default=off)"));
+	cl::opt<bool> AllExternalWarnings("all-external-warnings", cl::init(false),
+			cl::desc("Issue an warning everytime an external call is made,"
+					"as opposed to once per function (default=off)"));
 
-cl::opt<bool> OnlyOutputStatesCoveringNew("only-output-states-covering-new", cl::init(false), cl::desc("Only output test cases covering new code (default=off)."));
+	cl::opt<bool> OnlyOutputStatesCoveringNew("only-output-states-covering-new", cl::init(false),
+			cl::desc("Only output test cases covering new code (default=off)."));
 
-cl::opt<bool> EmitAllErrors("emit-all-errors", cl::init(false), cl::desc("Generate tests cases for all errors "
-		"(default=off, i.e. one per (error,instruction) pair)"));
+	cl::opt<bool> EmitAllErrors("emit-all-errors", cl::init(false), cl::desc("Generate tests cases for all errors "
+			"(default=off, i.e. one per (error,instruction) pair)"));
 
-cl::opt<bool> NoExternals("no-externals", cl::desc("Do not allow external function calls (default=off)"));
+	cl::opt<bool> NoExternals("no-externals", cl::desc("Do not allow external function calls (default=off)"));
 
-cl::opt<bool> AlwaysOutputSeeds("always-output-seeds", cl::init(true));
+	cl::opt<bool> AlwaysOutputSeeds("always-output-seeds", cl::init(true));
 
-cl::opt<bool> OnlyReplaySeeds("only-replay-seeds", cl::init(false), cl::desc("Discard states that do not have a seed (default=off)."));
+	cl::opt<bool> OnlyReplaySeeds("only-replay-seeds", cl::init(false), cl::desc("Discard states that do not have a seed (default=off)."));
 
-cl::opt<bool> OnlySeed("only-seed", cl::init(false), cl::desc("Stop execution after seeding is done without doing regular search (default=off)."));
+	cl::opt<bool> OnlySeed("only-seed", cl::init(false),
+			cl::desc("Stop execution after seeding is done without doing regular search (default=off)."));
 
-cl::opt<bool> AllowSeedExtension("allow-seed-extension", cl::init(false), cl::desc("Allow extra (unbound) values to become symbolic during seeding (default=false)."));
+	cl::opt<bool> AllowSeedExtension("allow-seed-extension", cl::init(false),
+			cl::desc("Allow extra (unbound) values to become symbolic during seeding (default=false)."));
 
-cl::opt<bool> ZeroSeedExtension("zero-seed-extension", cl::init(false), cl::desc("(default=off)"));
+	cl::opt<bool> ZeroSeedExtension("zero-seed-extension", cl::init(false), cl::desc("(default=off)"));
 
-cl::opt<bool> AllowSeedTruncation("allow-seed-truncation", cl::init(false), cl::desc("Allow smaller buffers than in seeds (default=off)."));
+	cl::opt<bool> AllowSeedTruncation("allow-seed-truncation", cl::init(false),
+			cl::desc("Allow smaller buffers than in seeds (default=off)."));
 
-cl::opt<bool> NamedSeedMatching("named-seed-matching", cl::init(false), cl::desc("Use names to match symbolic objects to inputs (default=off)."));
+	cl::opt<bool> NamedSeedMatching("named-seed-matching", cl::init(false),
+			cl::desc("Use names to match symbolic objects to inputs (default=off)."));
 
-cl::opt<double> MaxStaticForkPct("max-static-fork-pct", cl::init(1.), cl::desc("(default=1.0)"));
+	cl::opt<double> MaxStaticForkPct("max-static-fork-pct", cl::init(1.), cl::desc("(default=1.0)"));
 
-cl::opt<double> MaxStaticSolvePct("max-static-solve-pct", cl::init(1.), cl::desc("(default=1.0)"));
+	cl::opt<double> MaxStaticSolvePct("max-static-solve-pct", cl::init(1.), cl::desc("(default=1.0)"));
 
-cl::opt<double> MaxStaticCPForkPct("max-static-cpfork-pct", cl::init(1.), cl::desc("(default=1.0)"));
+	cl::opt<double> MaxStaticCPForkPct("max-static-cpfork-pct", cl::init(1.), cl::desc("(default=1.0)"));
 
-cl::opt<double> MaxStaticCPSolvePct("max-static-cpsolve-pct", cl::init(1.), cl::desc("(default=1.0)"));
+	cl::opt<double> MaxStaticCPSolvePct("max-static-cpsolve-pct", cl::init(1.), cl::desc("(default=1.0)"));
 
-cl::opt<double> MaxInstructionTime("max-instruction-time", cl::desc("Only allow a single instruction to take this much time (default=0s (off)). Enables --use-forked-solver"),
-		cl::init(0));
+	cl::opt<double> MaxInstructionTime("max-instruction-time",
+			cl::desc("Only allow a single instruction to take this much time (default=0s (off)). Enables --use-forked-solver"),
+			cl::init(0));
 
-cl::opt<double> SeedTime("seed-time", cl::desc("Amount of time to dedicate to seeds, before normal search (default=0 (off))"), cl::init(0));
+	cl::opt<double> SeedTime("seed-time", cl::desc("Amount of time to dedicate to seeds, before normal search (default=0 (off))"),
+			cl::init(0));
 
-cl::opt<unsigned int> StopAfterNInstructions("stop-after-n-instructions", cl::desc("Stop execution after specified number of instructions (default=0 (off))"), cl::init(0));
+	cl::opt<unsigned int> StopAfterNInstructions("stop-after-n-instructions",
+			cl::desc("Stop execution after specified number of instructions (default=0 (off))"), cl::init(0));
 
-cl::opt<unsigned> MaxForks("max-forks", cl::desc("Only fork this many times (default=-1 (off))"), cl::init(~0u));
+	cl::opt<unsigned> MaxForks("max-forks", cl::desc("Only fork this many times (default=-1 (off))"), cl::init(~0u));
 
-cl::opt<unsigned> MaxDepth("max-depth", cl::desc("Only allow this many symbolic branches (default=0 (off))"), cl::init(0));
+	cl::opt<unsigned> MaxDepth("max-depth", cl::desc("Only allow this many symbolic branches (default=0 (off))"), cl::init(0));
 
-cl::opt<unsigned> MaxMemory("max-memory", cl::desc("Refuse to fork when above this amount of memory (in MB, default=2000)"), cl::init(8000));
+	cl::opt<unsigned> MaxMemory("max-memory", cl::desc("Refuse to fork when above this amount of memory (in MB, default=2000)"),
+			cl::init(8000));
 
-cl::opt<bool> MaxMemoryInhibit("max-memory-inhibit", cl::desc("Inhibit forking at memory cap (vs. random terminate) (default=on)"), cl::init(true));
+	cl::opt<bool> MaxMemoryInhibit("max-memory-inhibit", cl::desc("Inhibit forking at memory cap (vs. random terminate) (default=on)"),
+			cl::init(true));
 }
 
 namespace klee {
-RNG theRNG;
+	RNG theRNG;
 }
 
 bool Executor::hasInitialized = false;
 
 Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih) :
-		Interpreter(opts), kmodule(0), interpreterHandler(ih), searcher(0), externalDispatcher(new ExternalDispatcher()), statsTracker(0), pathWriter(0), symPathWriter(0), specialFunctionHandler(
-				0), processTree(0), replayKTest(0), replayPath(0), replayPosition(0), usingSeeds(0), atMemoryLimit(false), inhibitForking(false), haltExecution(false), ivcEnabled(
-				false), coreSolverTimeout(
-				MaxCoreSolverTime != 0 && MaxInstructionTime != 0 ? std::min(MaxCoreSolverTime, MaxInstructionTime) : std::max(MaxCoreSolverTime, MaxInstructionTime)), debugInstFile(
+		Interpreter(opts), kmodule(0), interpreterHandler(ih), searcher(0), externalDispatcher(new ExternalDispatcher()), statsTracker(0), pathWriter(
+				0), symPathWriter(0), specialFunctionHandler(0), processTree(0), replayKTest(0), replayPath(0), replayPosition(0), usingSeeds(
+				0), atMemoryLimit(false), inhibitForking(false), haltExecution(false), ivcEnabled(false), coreSolverTimeout(
+				MaxCoreSolverTime != 0 && MaxInstructionTime != 0 ?
+						std::min(MaxCoreSolverTime, MaxInstructionTime) : std::max(MaxCoreSolverTime, MaxInstructionTime)), debugInstFile(
 				0), debugLogBuffer(debugBufferString), isFinished(false), prefix(NULL), executionNum(0), execStatus(SUCCESS) {
 
 	if (coreSolverTimeout)
@@ -210,13 +230,15 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih) :
 		exit(1);
 	}
 	Solver *solver = constructSolverChain(coreSolver, interpreterHandler->getOutputFilename(ALL_QUERIES_SMT2_FILE_NAME),
-			interpreterHandler->getOutputFilename(SOLVER_QUERIES_SMT2_FILE_NAME), interpreterHandler->getOutputFilename(ALL_QUERIES_PC_FILE_NAME),
+			interpreterHandler->getOutputFilename(SOLVER_QUERIES_SMT2_FILE_NAME),
+			interpreterHandler->getOutputFilename(ALL_QUERIES_PC_FILE_NAME),
 			interpreterHandler->getOutputFilename(SOLVER_QUERIES_PC_FILE_NAME));
 
 	this->solver = new TimingSolver(solver, EqualitySubstitution);
 	memory = new MemoryManager(&arrayCache);
 
-	if (optionIsSet(DebugPrintInstructions, FILE_ALL) || optionIsSet(DebugPrintInstructions, FILE_COMPACT) || optionIsSet(DebugPrintInstructions, FILE_SRC)) {
+	if (optionIsSet(DebugPrintInstructions, FILE_ALL) || optionIsSet(DebugPrintInstructions, FILE_COMPACT)
+			|| optionIsSet(DebugPrintInstructions, FILE_SRC)) {
 		std::string debug_file_name = interpreterHandler->getOutputFilename("instructions.txt");
 		std::string ErrorInfo;
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
@@ -276,6 +298,8 @@ Executor::~Executor() {
 	if (debugInstFile) {
 		delete debugInstFile;
 	}
+
+	delete listenerService;
 }
 
 /***/
@@ -416,7 +440,8 @@ void Executor::initializeGlobals(ExecutionState &state) {
 #endif
 
 			if (size == 0) {
-				llvm::errs() << "Unable to find size for global variable: " << i->getName() << " (use will result in out of bounds access)\n";
+				llvm::errs() << "Unable to find size for global variable: " << i->getName()
+						<< " (use will result in out of bounds access)\n";
 			}
 
 			MemoryObject *mo = memory->allocate(size, false, true, i);
@@ -559,14 +584,16 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 	std::map<ExecutionState*, std::vector<SeedInfo> >::iterator it = seedMap.find(&current);
 	bool isSeeding = it != seedMap.end();
 
-	if (!isSeeding && !isa<ConstantExpr>(condition) && (MaxStaticForkPct != 1. || MaxStaticSolvePct != 1. || MaxStaticCPForkPct != 1. || MaxStaticCPSolvePct != 1.)
+	if (!isSeeding && !isa<ConstantExpr>(condition)
+			&& (MaxStaticForkPct != 1. || MaxStaticSolvePct != 1. || MaxStaticCPForkPct != 1. || MaxStaticCPSolvePct != 1.)
 			&& statsTracker->elapsed() > 60.) {
 		StatisticManager &sm = *theStatisticManager;
 		CallPathNode *cpn = current.currentStack->realStack.back().callPathNode;
 		if ((MaxStaticForkPct < 1. && sm.getIndexedValue(stats::forks, sm.getIndex()) > stats::forks * MaxStaticForkPct)
 				|| (MaxStaticCPForkPct < 1. && cpn && (cpn->statistics.getValue(stats::forks) > stats::forks * MaxStaticCPForkPct))
 				|| (MaxStaticSolvePct < 1 && sm.getIndexedValue(stats::solverTime, sm.getIndex()) > stats::solverTime * MaxStaticSolvePct)
-				|| (MaxStaticCPForkPct < 1. && cpn && (cpn->statistics.getValue(stats::solverTime) > stats::solverTime * MaxStaticCPSolvePct))) {
+				|| (MaxStaticCPForkPct < 1. && cpn
+						&& (cpn->statistics.getValue(stats::solverTime) > stats::solverTime * MaxStaticCPSolvePct))) {
 			ref<ConstantExpr> value;
 			bool success = solver->getValue(current, condition, value);
 			assert(success && "FIXME: Unhandled solver failure");
@@ -610,7 +637,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 		} else if (res == Solver::Unknown) {
 			assert(!replayKTest && "in replay mode, only one branch can be true.");
 
-			if ((MaxMemoryInhibit && atMemoryLimit) || current.forkDisabled || inhibitForking || (MaxForks != ~0u && stats::forks >= MaxForks)) {
+			if ((MaxMemoryInhibit && atMemoryLimit) || current.forkDisabled || inhibitForking
+					|| (MaxForks != ~0u && stats::forks >= MaxForks)) {
 
 				if (MaxMemoryInhibit && atMemoryLimit)
 					klee_warning_once(0, "skipping fork (memory cap exceeded)");
@@ -823,7 +851,8 @@ ref<klee::ConstantExpr> Executor::evalConstant(const Constant *c) {
 				unsigned op = i - 1;
 				ref<Expr> kid = evalConstant(cs->getOperand(op));
 
-				uint64_t thisOffset = sl->getElementOffsetInBits(op), nextOffset = (op == cs->getNumOperands() - 1) ? sl->getSizeInBits() : sl->getElementOffsetInBits(op + 1);
+				uint64_t thisOffset = sl->getElementOffsetInBits(op), nextOffset =
+						(op == cs->getNumOperands() - 1) ? sl->getSizeInBits() : sl->getElementOffsetInBits(op + 1);
 				if (nextOffset - thisOffset > kid->getWidth()) {
 					uint64_t paddingWidth = nextOffset - thisOffset - kid->getWidth();
 					kids.push_back(ConstantExpr::create(0, paddingWidth));
@@ -883,7 +912,6 @@ void Executor::ineval(KInstruction *ki, unsigned index, ExecutionState &state, r
 	}
 }
 
-
 void Executor::bindLocal(KInstruction *target, ExecutionState &state, ref<Expr> value) {
 	getDestCell(state, target).value = value;
 }
@@ -922,8 +950,8 @@ ref<klee::ConstantExpr> Executor::toConstant(ExecutionState &state, ref<Expr> e,
 
 	std::string str;
 	llvm::raw_string_ostream os(str);
-	os << "silently concretizing (reason: " << reason << ") expression " << e << " to value " << value << " (" << (*(state.currentThread->pc)).info->file << ":"
-			<< (*(state.currentThread->pc)).info->line << ")";
+	os << "silently concretizing (reason: " << reason << ") expression " << e << " to value " << value << " ("
+			<< (*(state.currentThread->pc)).info->file << ":" << (*(state.currentThread->pc)).info->line << ")";
 
 	if (AllExternalWarnings)
 		klee_warning(reason, os.str().c_str());
@@ -977,7 +1005,8 @@ void Executor::printDebugInstructions(ExecutionState &state) {
 		return;
 
 	llvm::raw_ostream *stream = 0;
-	if (optionIsSet(DebugPrintInstructions, STDERR_ALL) || optionIsSet(DebugPrintInstructions, STDERR_SRC) || optionIsSet(DebugPrintInstructions, STDERR_COMPACT))
+	if (optionIsSet(DebugPrintInstructions, STDERR_ALL) || optionIsSet(DebugPrintInstructions, STDERR_SRC)
+			|| optionIsSet(DebugPrintInstructions, STDERR_COMPACT))
 		stream = &llvm::errs();
 	else
 		stream = &debugLogBuffer;
@@ -991,7 +1020,8 @@ void Executor::printDebugInstructions(ExecutionState &state) {
 		(*stream) << ":" << *(state.currentThread->pc->inst);
 	(*stream) << "\n";
 
-	if (optionIsSet(DebugPrintInstructions, FILE_ALL) || optionIsSet(DebugPrintInstructions, FILE_COMPACT) || optionIsSet(DebugPrintInstructions, FILE_SRC)) {
+	if (optionIsSet(DebugPrintInstructions, FILE_ALL) || optionIsSet(DebugPrintInstructions, FILE_COMPACT)
+			|| optionIsSet(DebugPrintInstructions, FILE_SRC)) {
 		debugLogBuffer.flush();
 		(*debugInstFile) << debugLogBuffer.str();
 		debugBufferString = "";
@@ -1038,9 +1068,12 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
 					// instead of implementing it, we can do a simple hack: just
 					// make a function believe that all varargs are on stack.
 					executeMemoryOperation(state, true, arguments[0], ConstantExpr::create(48, 32), 0); // gp_offset
-					executeMemoryOperation(state, true, AddExpr::create(arguments[0], ConstantExpr::create(4, 64)), ConstantExpr::create(304, 32), 0); // fp_offset
-					executeMemoryOperation(state, true, AddExpr::create(arguments[0], ConstantExpr::create(8, 64)), sf.varargs->getBaseExpr(), 0); // overflow_arg_area
-					executeMemoryOperation(state, true, AddExpr::create(arguments[0], ConstantExpr::create(16, 64)), ConstantExpr::create(0, 64), 0); // reg_save_area
+					executeMemoryOperation(state, true, AddExpr::create(arguments[0], ConstantExpr::create(4, 64)),
+							ConstantExpr::create(304, 32), 0); // fp_offset
+					executeMemoryOperation(state, true, AddExpr::create(arguments[0], ConstantExpr::create(8, 64)),
+							sf.varargs->getBaseExpr(), 0); // overflow_arg_area
+					executeMemoryOperation(state, true, AddExpr::create(arguments[0], ConstantExpr::create(16, 64)),
+							ConstantExpr::create(0, 64), 0); // reg_save_area
 				}
 				break;
 			}
@@ -1397,7 +1430,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #else
 						BasicBlock *caseSuccessor = si->getSuccessor(i);
 #endif
-						std::map<BasicBlock*, ref<Expr> >::iterator it = targets.insert(std::make_pair(caseSuccessor, ConstantExpr::alloc(0, Expr::Bool))).first;
+						std::map<BasicBlock*, ref<Expr> >::iterator it = targets.insert(
+								std::make_pair(caseSuccessor, ConstantExpr::alloc(0, Expr::Bool))).first;
 
 						it->second = OrExpr::create(match, it->second);
 					}
@@ -1519,7 +1553,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
 							// Don't give warning on unique resolution
 							if (res.second || !first)
-								klee_warning_once((void*) (unsigned long) addr, "resolved symbolic function pointer to: %s", f->getName().data());
+								klee_warning_once((void*) (unsigned long) addr, "resolved symbolic function pointer to: %s",
+										f->getName().data());
 
 							executeCall(*res.first, ki, f, arguments);
 						} else {
@@ -1786,7 +1821,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 			KGEPInstruction *kgepi = static_cast<KGEPInstruction*>(ki);
 			ref<Expr> base = eval(ki, 0, state).value;
 
-			for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie; ++it) {
+			for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie;
+					++it) {
 				uint64_t elementSize = it->second;
 				ref<Expr> index = eval(ki, it->first, state).value;
 				base = AddExpr::create(base, MulExpr::create(Expr::createSExtToPointerWidth(index), Expr::createPointer(elementSize)));
@@ -2553,9 +2589,9 @@ void Executor::run(ExecutionState &initialState) {
 	}
 
 	searcher = constructUserSearcher(*this);
-
 	searcher->update(0, states, std::set<ExecutionState*>());
 
+	listenerService->beforeRunMethodAsMain(initialState);
 	handleInitializers(initialState);
 
 	while (!states.empty() && !haltExecution) {
@@ -2577,8 +2613,8 @@ void Executor::run(ExecutionState &initialState) {
 					if (state.mutexManager.tryToLockForBlockedThread(thread->threadId, isBlocked, errorMsg)) {
 						if (isBlocked) {
 							if (prefix && !prefix->isFinished()) {
-								std::cerr << "thread" << thread->threadId << ": " << thread->pc->info->file << "/" << thread->pc->info->line << " "
-										<< thread->pc->inst->getOpcodeName() << std::endl;
+								std::cerr << "thread" << thread->threadId << ": " << thread->pc->info->file << "/" << thread->pc->info->line
+										<< " " << thread->pc->inst->getOpcodeName() << std::endl;
 								std::cerr << "thread state is MUTEX_BLOCKED, try to get lock but failed\n";
 								isAbleToRun = false;
 								break;
@@ -2654,11 +2690,13 @@ void Executor::run(ExecutionState &initialState) {
 		}
 		stepInstruction(state);
 
-		listenerService->executeInstruction(state, ki);
+		listenerService->beforeExecuteInstruction(state, ki);
 
 		executeInstruction(state, ki);
 
-		listenerService->instructionExecuted(state, ki);
+		listenerService->executeInstruction(state, ki);
+
+		listenerService->afterExecuteInstruction(state, ki);
 
 		if (prefix) {
 			prefix->increasePosition();
@@ -2684,6 +2722,8 @@ void Executor::run(ExecutionState &initialState) {
 
 	delete searcher;
 	searcher = 0;
+
+	listenerService->afterRunMethodAsMain();
 
 	dump: if (DumpStatesOnHalt && !states.empty()) {
 		llvm::errs() << "KLEE: halting execution, dumping remaining states\n";
@@ -2779,7 +2819,8 @@ void Executor::terminateStateOnExit(ExecutionState &state) {
 const InstructionInfo & Executor::getLastNonKleeInternalInstruction(const ExecutionState &state, Instruction ** lastInstruction) {
 	// unroll the stack of the applications state and find
 	// the last instruction which is not inside a KLEE internal function
-	ExecutionState::stack_ty::const_reverse_iterator it = state.currentStack->realStack.rbegin(), itE = state.currentStack->realStack.rend();
+	ExecutionState::stack_ty::const_reverse_iterator it = state.currentStack->realStack.rbegin(), itE =
+			state.currentStack->realStack.rend();
 
 	// don't check beyond the outermost function (i.e. main())
 	itE--;
@@ -2850,6 +2891,9 @@ void Executor::terminateStateOnError(ExecutionState &state, const llvm::Twine &m
 	}
 
 	terminateState(state);
+	std::cerr << "encounter runtime error\n";
+	execStatus = RUNTIMEERROR;
+	listenerService->executionFailed(state, state.currentThread->pc);
 }
 
 // XXX shoot me
@@ -2973,7 +3017,8 @@ ObjectState *Executor::bindObjectInState(ExecutionState &state, const MemoryObje
 	return os;
 }
 
-void Executor::executeAlloc(ExecutionState &state, ref<Expr> size, bool isLocal, KInstruction *target, bool zeroMemory, const ObjectState *reallocFrom) {
+void Executor::executeAlloc(ExecutionState &state, ref<Expr> size, bool isLocal, KInstruction *target, bool zeroMemory,
+		const ObjectState *reallocFrom) {
 	size = toUnique(state, size);
 	if (ConstantExpr *CE = dyn_cast<ConstantExpr>(size)) {
 		MemoryObject *mo = memory->allocate(CE->getZExtValue(), isLocal, false, state.currentThread->prevPC->inst);
@@ -3114,7 +3159,8 @@ void Executor::resolveExact(ExecutionState &state, ref<Expr> p, ExactResolutionL
 	}
 }
 
-void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite, ref<Expr> address, ref<Expr> value /* undef if read */, KInstruction *target /* undef if write */) {
+void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite, ref<Expr> address, ref<Expr> value /* undef if read */,
+		KInstruction *target /* undef if write */) {
 	Expr::Width type = (isWrite ? value->getWidth() : getWidthForLLVMType(target->inst->getType()));
 	unsigned bytes = Expr::getMinBytesForWidth(type);
 
@@ -3256,9 +3302,11 @@ void Executor::executeMakeSymbolic(ExecutionState &state, const MemoryObject *mo
 					}
 				} else {
 					if (obj->numBytes != mo->size
-							&& ((!(AllowSeedExtension || ZeroSeedExtension) && obj->numBytes < mo->size) || (!AllowSeedTruncation && obj->numBytes > mo->size))) {
+							&& ((!(AllowSeedExtension || ZeroSeedExtension) && obj->numBytes < mo->size)
+									|| (!AllowSeedTruncation && obj->numBytes > mo->size))) {
 						std::stringstream msg;
-						msg << "replace size mismatch: " << mo->name << "[" << mo->size << "]" << " vs " << obj->name << "[" << obj->numBytes << "]" << " in test\n";
+						msg << "replace size mismatch: " << mo->name << "[" << mo->size << "]" << " vs " << obj->name << "["
+								<< obj->numBytes << "]" << " in test\n";
 
 						terminateStateOnError(state, msg.str(), "user.err");
 						break;
@@ -3726,8 +3774,6 @@ unsigned Executor::executePThreadCreate(ExecutionState &state, KInstruction *ki,
 		IntegerType* elementType = (IntegerType*) (pointerType->getElementType());
 		ref<Expr> pidAddress = arguments[0];
 		executeMemoryOperation(state, true, pidAddress, ConstantExpr::create(newThread->threadId, elementType->getBitWidth()), 0);
-		listenerService->createThread(state, newThread);
-
 	} else {
 		assert(0 && "inst must be callInst!");
 	}
@@ -3977,6 +4023,7 @@ unsigned Executor::executePThreadBarrierDestory(ExecutionState &state, KInstruct
 void Executor::handleInitializers(ExecutionState& initialState) {
 	for (Module::const_global_iterator i = kmodule->module->global_begin(), e = kmodule->module->global_end(); i != e; ++i) {
 		if (i->hasInitializer() && i->getName().str().at(0) != '.') {
+			std::cerr << "name : " << i->getName().str() << "\n";
 			Type* type = i->getInitializer()->getType();
 			ConstantExpr* address = globalAddresses.find(i)->second.get();
 			uint64_t startAddress = address->getZExtValue();
@@ -3993,6 +4040,8 @@ void Executor::handleInitializers(ExecutionState& initialState) {
  * startAddress:
  */
 void Executor::createSpecialElement(ExecutionState& state, Type* type, uint64_t& startAddress, bool isInitializer) {
+
+	std::cerr << "type : " << type->getTypeID() << std::endl;
 
 	switch (type->getTypeID()) {
 
@@ -4042,7 +4091,7 @@ void Executor::createSpecialElement(ExecutionState& state, Type* type, uint64_t&
 			//内存对齐，这里计算结构体的内存对齐只是因为mutex，cond，barrier三种类型不会被解析，因此需要提前计算。
 			DataLayout* layout = kmodule->targetData;
 			//检查是否是opaque结构体，如果是跳过不做处理
-			if (!dyn_cast<StructType>(type)->isOpaque()) {
+			if (!dyn_cast<StructType>(type)->isOpaque() && !dyn_cast<StructType>(type)->isLiteral()) {
 				unsigned alignment = layout->getABITypeAlignment(type);
 				if (startAddress % alignment != 0) {
 					startAddress = (startAddress / alignment + 1) * alignment;
@@ -4080,8 +4129,7 @@ void Executor::createSpecialElement(ExecutionState& state, Type* type, uint64_t&
 		}
 
 		default: {
-			std::cerr << type->getTypeID() << std::endl;
-			assert(0 && "unsupport initializer type");
+//			assert(0 && "unsupport initializer type");
 		}
 
 	}

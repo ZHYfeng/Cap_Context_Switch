@@ -104,9 +104,10 @@ namespace {
                           cl::init(30.),
 			  cl::desc("(default=30.0s)"));
   
+  //@hy
   cl::opt<bool>
   UseCallPaths("use-call-paths",
-	       cl::init(true),
+	       cl::init(false),
                cl::desc("Enable calltree tracking for instruction level statistics (default=on)"));
   
 }

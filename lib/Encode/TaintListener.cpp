@@ -62,7 +62,7 @@ void TaintListener::beforeRunMethodAsMain(ExecutionState &initialState) {
 	endEvent = trace->path.end();
 }
 
-void TaintListener::executeInstruction(ExecutionState &state,
+void TaintListener::beforeExecuteInstruction(ExecutionState &state,
 		KInstruction *ki) {
 	Trace* trace = runtimeData->getCurrentTrace();
 	Instruction* inst = ki->inst;
@@ -376,7 +376,7 @@ void TaintListener::executeInstruction(ExecutionState &state,
 }
 
 //TODO： Algorithm 2 AnalyseTaint
-void TaintListener::instructionExecuted(ExecutionState &state,
+void TaintListener::afterExecuteInstruction(ExecutionState &state,
 		KInstruction *ki) {
 	Trace* trace = runtimeData->getCurrentTrace();
 	if ((*currentEvent)) {
@@ -538,11 +538,6 @@ void TaintListener::instructionExecuted(ExecutionState &state,
 //消息响应函数，在被测程序解释执行之后调用
 void TaintListener::afterRunMethodAsMain() {
 	cerr << "######################taint analysis####################\n";
-
-}
-
-//消息相应函数，在创建了新线程之后调用
-void TaintListener::createThread(ExecutionState &state, Thread* thread) {
 
 }
 

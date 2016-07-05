@@ -44,14 +44,12 @@ namespace klee {
 
 			void Preparation();
 			void beforeRunMethodAsMain(ExecutionState &initialState);
-			void executeInstruction(ExecutionState &state, KInstruction *ki);
-			void instructionExecuted(ExecutionState &state, KInstruction *ki);
+			void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki);
+			void afterExecuteInstruction(ExecutionState &state, KInstruction *ki);
 			void afterRunMethodAsMain();
 			void executionFailed(ExecutionState &state, KInstruction *ki);
 
-//			void createMutex(ExecutionState &state, Mutex* mutex);
-//			void createCondition(ExecutionState &state, Condition* condition);
-			void createThread(ExecutionState &state, Thread* thread);
+			void executeInstruction(ExecutionState &state, KInstruction *ki);
 
 			void startControl(Executor* executor);
 			void endControl(Executor* executor);

@@ -21,7 +21,8 @@ using namespace klee;
 namespace {
   cl::list<Searcher::CoreSearchType>
   CoreSearch("search", cl::desc("Specify the search heuristic (default=random-path interleaved with nurs:covnew)"),
-	     cl::values(clEnumValN(Searcher::DFS, "dfs", "use Depth First Search (DFS)"),
+	     cl::values(
+	    	clEnumValN(Searcher::DFS, "dfs", "use Depth First Search (DFS)"),
 			clEnumValN(Searcher::BFS, "bfs", "use Breadth First Search (BFS)"),
 			clEnumValN(Searcher::RandomState, "random-state", "randomly select a state to explore"),
 			clEnumValN(Searcher::RandomPath, "random-path", "use Random Path Selection (see OSDI'08 paper)"),
@@ -93,11 +94,13 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
 
 Searcher *klee::constructUserSearcher(Executor &executor) {
 
-  // default values
-  if (CoreSearch.size() == 0) {
-    CoreSearch.push_back(Searcher::RandomPath);
-    CoreSearch.push_back(Searcher::NURS_CovNew);
-  }
+	//@hy
+	// default values
+	if (CoreSearch.size() == 0) {
+		CoreSearch.push_back(Searcher::DFS);
+//    	CoreSearch.push_back(Searcher::RandomPath);
+//   	CoreSearch.push_back(Searcher::NURS_CovNew);
+	}
 
   Searcher *searcher = getNewSearcher(CoreSearch[0], executor);
   

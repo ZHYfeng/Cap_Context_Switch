@@ -21,6 +21,7 @@ namespace klee {
 	class StackType {
 		public:
 			StackType(AddressSpace *addressSpace);
+			StackType(AddressSpace *addressSpace, StackType *stack);
 			virtual ~StackType();
 
 			void pushFrame(KInstIterator caller, KFunction *kf);

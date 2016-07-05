@@ -36,10 +36,9 @@ namespace klee {
 			virtual ~SymbolicListener();
 
 			void beforeRunMethodAsMain(ExecutionState &initialState);
-			void executeInstruction(ExecutionState &state, KInstruction *ki);
-			void instructionExecuted(ExecutionState &state, KInstruction *ki);
+			void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki);
+			void afterExecuteInstruction(ExecutionState &state, KInstruction *ki);
 			void afterRunMethodAsMain();
-			void createThread(ExecutionState &state, Thread* thread);
 			void executionFailed(ExecutionState &state, KInstruction *ki);
 
 		private:

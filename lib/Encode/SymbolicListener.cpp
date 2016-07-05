@@ -87,7 +87,7 @@ void SymbolicListener::beforeRunMethodAsMain(ExecutionState &initialState) {
 }
 
 
-void SymbolicListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
+void SymbolicListener::beforeExecuteInstruction(ExecutionState &state, KInstruction *ki) {
 	Trace* trace = runtimeData->getCurrentTrace();
 	if ((*currentEvent)) {
 		Instruction* inst = ki->inst;
@@ -376,7 +376,7 @@ void SymbolicListener::executeInstruction(ExecutionState &state, KInstruction *k
 
 }
 
-void SymbolicListener::instructionExecuted(ExecutionState &state, KInstruction *ki) {
+void SymbolicListener::afterExecuteInstruction(ExecutionState &state, KInstruction *ki) {
 	Trace* trace = runtimeData->getCurrentTrace();
 	if ((*currentEvent)) {
 		Instruction* inst = ki->inst;
@@ -430,7 +430,7 @@ void SymbolicListener::instructionExecuted(ExecutionState &state, KInstruction *
 				}
 			}
 			if (isFloat) {
-				thread->stack.realStack.back().locals[ki->dest].value.get()->isFloat =
+				thread->stack->realStack.back().locals[ki->dest].value.get()->isFloat =
 						true;
 			}
 			break;
@@ -569,13 +569,6 @@ void SymbolicListener::afterRunMethodAsMain() {
 	//			encode.showInitTrace();//need to be modified
 #endif
 }
-
-
-//消息相应函数，在创建了新线程之后调用
-void SymbolicListener::createThread(ExecutionState &state, Thread* thread) {
-
-}
-
 
 //消息相应函数，在前缀执行出错之后程序推出之前调用
 void SymbolicListener::executionFailed(ExecutionState &state, KInstruction *ki) {

@@ -53,7 +53,7 @@ typedef struct {
   int *chmod_fail, *fchmod_fail;
 } exe_file_system_t;
 
-#define MAX_FDS 32
+#define MAX_FDS 64
 
 /* Note, if you change this structure be sure to update the
    initialization code if necessary. New fields should almost

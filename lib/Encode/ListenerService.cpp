@@ -58,15 +58,15 @@ namespace klee {
 		}
 	}
 
-	void ListenerService::executeInstruction(ExecutionState &state, KInstruction *ki) {
+	void ListenerService::beforeExecuteInstruction(ExecutionState &state, KInstruction *ki) {
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
-			(*bit)->executeInstruction(state, ki);
+			(*bit)->beforeExecuteInstruction(state, ki);
 		}
 	}
 
-	void ListenerService::instructionExecuted(ExecutionState &state, KInstruction *ki) {
+	void ListenerService::afterExecuteInstruction(ExecutionState &state, KInstruction *ki) {
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
-			(*bit)->instructionExecuted(state, ki);
+			(*bit)->afterExecuteInstruction(state, ki);
 		}
 	}
 
@@ -82,10 +82,8 @@ namespace klee {
 		}
 	}
 
-	void ListenerService::createThread(ExecutionState &state, Thread* thread) {
-		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
-			(*bit)->createThread(state, thread);
-		}
+	void ListenerService::executeInstruction(ExecutionState &state, KInstruction *ki) {
+
 	}
 
 	void ListenerService::startControl(Executor* executor) {
