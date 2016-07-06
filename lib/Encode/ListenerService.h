@@ -49,7 +49,7 @@ namespace klee {
 			void afterRunMethodAsMain();
 			void executionFailed(ExecutionState &state, KInstruction *ki);
 
-			void executeInstruction(ExecutionState &state, KInstruction *ki);
+			void executeInstruction(Executor* executor, ExecutionState &state, KInstruction *ki);
 
 			void startControl(Executor* executor);
 			void endControl(Executor* executor);

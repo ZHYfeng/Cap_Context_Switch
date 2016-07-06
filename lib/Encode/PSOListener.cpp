@@ -6,16 +6,13 @@
  */
 
 #include "PSOListener.h"
+
 #include "klee/Expr.h"
 #include "Trace.h"
 #include "Transfer.h"
 #include "../Core/Executor.h"
+#include "../Core/ExternalDispatcher.h"
 #include "klee/Internal/Module/KModule.h"
-#include <iostream>
-#include <fstream>
-#include <unistd.h>
-#include <malloc.h>
-#include <string>
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -24,6 +21,12 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/DebugInfo.h"
+
+#include <iostream>
+#include <fstream>
+#include <unistd.h>
+#include <malloc.h>
+#include <string>
 
 using namespace std;
 using namespace llvm;
@@ -36,10 +39,8 @@ using namespace llvm;
 
 namespace klee {
 
-	Event* lastEvent;
-
 	PSOListener::PSOListener(Executor* executor, RuntimeDataManager* rdManager) :
-			BitcodeListener(), executor(executor), rdManager(rdManager) {
+			BitcodeListener(rdManager), executor(executor), lastEvent(NULL) {
 		// TODO Auto-generated constructor stub
 		kind = PSOListenerKind;
 	}
@@ -56,9 +57,49 @@ namespace klee {
 //消息响应函数，在被测程序解释执行之前调用
 	void PSOListener::beforeRunMethodAsMain(ExecutionState &initialState) {
 
-		//收集全局变量初始化值
 		Module* m = executor->kmodule->module;
 		rdManager->createNewTrace(executor->executionNum);
+		initialState.currentStack = stack[initialState.currentThread->threadId];
+
+		// allocate memory objects for all globals
+		for (Module::const_global_iterator i = m->global_begin(), e = m->global_end(); i != e; ++i) {
+			if (i->isDeclaration()) {
+
+				LLVM_TYPE_Q Type *ty = i->getType()->getElementType();
+				uint64_t size = executor->kmodule->targetData->getTypeStoreSize(ty);
+
+				MemoryObject *mo = executor->globalObjects.find(i)->second;
+				ObjectState *os = executor->bindObjectInState(initialState, mo, false);
+
+				if (size) {
+					void *addr;
+					if (i->getName() == "__dso_handle") {
+						addr = &__dso_handle; // wtf ?
+					} else {
+						addr = executor->externalDispatcher->resolveSymbol(i->getName());
+					}
+					for (unsigned offset = 0; offset < mo->size; offset++)
+						os->write8(offset, ((unsigned char*) addr)[offset]);
+				}
+			} else {
+				MemoryObject *mo = executor->globalObjects.find(i)->second;
+				ObjectState *os = executor->bindObjectInState(initialState, mo, false);
+
+				if (!i->hasInitializer())
+					os->initializeToRandom();
+			}
+		}
+		// once all objects are allocated, do the actual initialization
+		for (Module::const_global_iterator i = m->global_begin(), e = m->global_end(); i != e; ++i) {
+			if (i->hasInitializer()) {
+				MemoryObject *mo = executor->globalObjects.find(i)->second;
+				const ObjectState *os = initialState.currentStack->addressSpace->findObject(mo);
+				ObjectState *wos = initialState.currentStack->addressSpace->getWriteable(mo, os);
+				executor->initializeGlobalObject(initialState, wos, i->getInitializer(), 0);
+			}
+		}
+
+		//收集全局变量初始化值
 		for (Module::global_iterator i = m->global_begin(), e = m->global_end(); i != e; ++i) {
 			if (i->hasInitializer() && i->getName().str().at(0) != '.') {
 //				std::cerr << "name : " << i->getName().str() << "\n";
@@ -89,7 +130,6 @@ namespace klee {
 		Thread* thread = state.currentThread;
 		Event* item = NULL;
 		KModule* kmodule = executor->kmodule;
-		lastEvent = NULL;
 
 //	cerr << "thread id : " << thread->threadId << " line : " << ki->info->line;
 //	inst->dump();

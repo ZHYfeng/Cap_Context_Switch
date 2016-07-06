@@ -33,27 +33,16 @@ namespace llvm {
 	class Function;
 } /* namespace llvm */
 
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/DerivedTypes.h"
-#else
-#include "llvm/Instructions.h"
-#include "llvm/Type.h"
-#include "llvm/DerivedTypes.h"
-#endif
-
-namespace llvm {
-//class Type;
-//class Constant;
-}
 
 namespace klee {
 
 	class PSOListener: public BitcodeListener {
 		public:
 			PSOListener(Executor* executor, RuntimeDataManager* rdManager);
-			~PSOListener();
+			virtual ~PSOListener();
 
 			void beforeRunMethodAsMain(ExecutionState &initialState);
 			void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki);
@@ -62,17 +51,15 @@ namespace klee {
 			void executionFailed(ExecutionState &state, KInstruction *ki);
 
 		private:
+
 			Executor* executor;
-			RuntimeDataManager* rdManager;
+			Event* lastEvent;
 
 			std::stringstream ss;
 			std::map<uint64_t, unsigned> loadRecord;
 			std::map<uint64_t, unsigned> storeRecord;
 			std::map<uint64_t, llvm::Type*> usedGlobalVariableRecord;
 			std::map<uint64_t, BarrierInfo*> barrierRecord;
-
-			AddressSpace addressSpace;
-			std::map<unsigned, StackType*> stack;
 
 		private:
 			//std::vector<string> monitoredFunction;

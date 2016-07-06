@@ -7,8 +7,12 @@
 
 #include "BitcodeListener.h"
 
-
 namespace klee {
+
+	BitcodeListener::BitcodeListener(RuntimeDataManager* rdManager) :
+			kind(0), rdManager(rdManager) {
+
+	}
 
 	BitcodeListener::~BitcodeListener() {
 

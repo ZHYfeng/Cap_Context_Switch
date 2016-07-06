@@ -25,7 +25,7 @@
 
 namespace klee {
 
-//added by xdzhang
+	//added by xdzhang
 	struct Wait_Lock {
 			Event* wait;
 			Event* lock_by_wait; //lock op included in wait function
@@ -48,7 +48,6 @@ namespace klee {
 			};
 			unsigned Id;
 			unsigned nextEventId;
-//	int argc; // input count
 			std::vector<std::vector<Event*>*> eventList; // all event, sorted by threadId and event Id
 			std::vector<std::string> abstract;
 			std::stringstream ss;
@@ -149,16 +148,13 @@ namespace klee {
 
 			//锁操作集合，以lock/unlock为对收集-->生成同步语义约束
 			std::map<std::string, std::vector<LockPair *> > all_lock_unlock; //key--mutex（锁名，一个地址就ok，每个锁全局必唯一）, value--the whole lock/unlock pairs with respect to one mutex
-			//条件变量操作
 			std::map<std::string, std::vector<Wait_Lock *> > all_wait;//key--condition 变量标识, value--the whole wait events that wait this conditional var
 			std::map<std::string, std::vector<Event *> > all_signal;//key--condition 变量标识, value--the whole signal events that signal this conditional var
-
-			//barrier操作
 			std::map<std::string, std::vector<Event *> > all_barrier;//key--barrier地址#release次数, value--the whole wait events that wait this barrier var
 
-			//全局变量初始值
 			std::map<std::string, llvm::Constant*> global_variable_initializer;
 			std::map<std::string, llvm::Constant*> global_variable_initializer_RelatedToBranch;
+
 			//全局变量最终值-只记录使用的全局变量
 			std::map<std::string, llvm::Constant*> global_variable_final;
 			//输出语句printf产生的变量值

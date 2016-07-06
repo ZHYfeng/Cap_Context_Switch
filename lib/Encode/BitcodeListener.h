@@ -9,6 +9,9 @@
 #define BITCODELISTENER_H_
 
 #include "klee/ExecutionState.h"
+#include "../Core/AddressSpace.h"
+#include "../Encode/RuntimeDataManager.h"
+#include "../Thread/StackType.h"
 
 namespace klee {
 
@@ -16,6 +19,7 @@ class BitcodeListener {
 	public:
 
 		enum listenerKind {
+			defaultKind,
 			PSOListenerKind,
 			SymbolicListenerKind,
 			TaintListenerKind,
@@ -23,14 +27,23 @@ class BitcodeListener {
 			DebugerListenerKind
 		};
 
+		BitcodeListener(RuntimeDataManager* rdManager);
+		virtual ~BitcodeListener();
+
 		listenerKind kind;
 
-		virtual ~BitcodeListener();
+		RuntimeDataManager* rdManager;
+
+		AddressSpace addressSpace;
+		std::map<unsigned, StackType*> stack;
+
 		virtual void beforeRunMethodAsMain(ExecutionState &initialState) = 0;
 		virtual void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki) = 0;
 		virtual void afterExecuteInstruction(ExecutionState &state, KInstruction *ki) = 0;
 		virtual void afterRunMethodAsMain() = 0;
 		virtual void executionFailed(ExecutionState &state, KInstruction *ki) = 0;
+
+
 
 };
 

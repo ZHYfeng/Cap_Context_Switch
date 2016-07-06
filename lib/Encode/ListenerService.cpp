@@ -10,10 +10,6 @@
 
 #include "ListenerService.h"
 
-#include <stddef.h>
-#include <sys/time.h>
-#include <iterator>
-
 #include "../Core/Executor.h"
 #include "DTAM.h"
 #include "Encode.h"
@@ -21,6 +17,13 @@
 #include "PSOListener.h"
 #include "SymbolicListener.h"
 #include "TaintListener.h"
+
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/DataLayout.h>
+
+#include <stddef.h>
+#include <sys/time.h>
+#include <iterator>
 
 namespace klee {
 
@@ -32,9 +35,7 @@ namespace klee {
 	}
 
 	ListenerService::~ListenerService() {
-		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
-			bitcodeListeners.erase(bit);
-		}
+
 	}
 
 	void ListenerService::pushListener(BitcodeListener* bitcodeListener) {
@@ -97,7 +98,171 @@ namespace klee {
 		}
 	}
 
-	void ListenerService::executeInstruction(ExecutionState &state, KInstruction *ki) {
+	void ListenerService::executeInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
+
+		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+			state.currentStack = (*bit)->stack[state.currentThread->threadId];
+			state.currentStack = state.currentThread->stack;
+		}
+
+		Instruction *i = ki->inst;
+		switch (i->getOpcode()) {
+			// Control flow
+			case Instruction::Ret: {
+				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie;
+						++bit) {
+					state.currentStack = (*bit)->stack[state.currentThread->threadId];
+					ReturnInst *ri = cast<ReturnInst>(i);
+					KInstIterator kcaller = state.currentStack->realStack.back().caller;
+					Instruction *caller = kcaller ? kcaller->inst : 0;
+					bool isVoidReturn = (ri->getNumOperands() == 0);
+					ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
+
+					if (!isVoidReturn) {
+						result = executor->eval(ki, 0, state).value;
+					}
+
+					state.currentStack->popFrame();
+
+					if (!isVoidReturn) {
+						LLVM_TYPE_Q Type *t = caller->getType();
+						if (t != Type::getVoidTy(getGlobalContext())) {
+							// may need to do coercion due to bitcasts
+							Expr::Width from = result->getWidth();
+							Expr::Width to = executor->getWidthForLLVMType(t);
+
+							if (from != to) {
+								CallSite cs = (
+										isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
+
+								bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
+								if (isSExt) {
+									result = SExtExpr::create(result, to);
+								} else {
+									result = ZExtExpr::create(result, to);
+								}
+							}
+
+							executor->bindLocal(kcaller, state, result);
+						}
+					}
+					state.currentStack = state.currentThread->stack;
+				}
+				break;
+			}
+
+			case Instruction::Invoke:
+			case Instruction::Call: {
+				CallSite cs(i);
+
+				unsigned numArgs = cs.arg_size();
+				Value *fp = cs.getCalledValue();
+				Function *f = executor->getTargetFunction(fp, state);
+
+				if (isa<InlineAsm>(fp)) {
+					executor->terminateStateOnExecError(state, "inline assembly is unsupported");
+					break;
+				}
+				// evaluate arguments
+				std::vector<ref<Expr> > arguments;
+				arguments.reserve(numArgs);
+
+				for (unsigned j = 0; j < numArgs; ++j)
+					arguments.push_back(executor->eval(ki, j + 1, state).value);
+
+				if (f) {
+					const FunctionType *fType = dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
+					const FunctionType *fpType = dyn_cast<FunctionType>(cast<PointerType>(fp->getType())->getElementType());
+
+					// special case the call with a bitcast case
+					if (fType != fpType) {
+						assert(fType && fpType && "unable to get function type");
+
+						// XXX check result coercion
+
+						// XXX this really needs thought and validation
+						unsigned i = 0;
+						for (std::vector<ref<Expr> >::iterator ai = arguments.begin(), ie = arguments.end(); ai != ie; ++ai) {
+							Expr::Width to, from = (*ai)->getWidth();
+
+							if (i < fType->getNumParams()) {
+								to = executor->getWidthForLLVMType(fType->getParamType(i));
+								if (from != to) {
+									bool isSExt = cs.paramHasAttr(i + 1, llvm::Attribute::SExt);
+									if (isSExt) {
+										arguments[i] = SExtExpr::create(arguments[i], to);
+									} else {
+										arguments[i] = ZExtExpr::create(arguments[i], to);
+									}
+								}
+							}
+
+							i++;
+						}
+					}
+
+					executor->executeCall(state, ki, f, arguments);
+				} else {
+					assert(0 && "listenerSercive execute call");
+				}
+				break;
+			}
+
+				// Memory instructions...
+			case Instruction::Alloca: {
+				AllocaInst *ai = cast<AllocaInst>(i);
+				unsigned elementSize = executor->kmodule->targetData->getTypeStoreSize(ai->getAllocatedType());
+				ref<Expr> size = Expr::createPointer(elementSize);
+				if (ai->isArrayAllocation()) {
+					ref<Expr> count = executor->eval(ki, 0, state).value;
+					count = Expr::createZExtToPointerWidth(count);
+					size = MulExpr::create(size, count);
+				}
+				bool isLocal = true;
+				size = executor->toUnique(state, size);
+				if (ConstantExpr *CE = dyn_cast<ConstantExpr>(size)) {
+					ref<Expr> addr = executor->getDestCell(state, ki).value;
+					ObjectPair op;
+					bool success = executor->getMemoryObject(op, state, state.currentThread->addressSpace, addr);
+					if (success) {
+						const MemoryObject *mo = op.first;
+						for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end();
+								bit != bie; ++bit) {
+							state.currentStack = (*bit)->stack[state.currentThread->threadId];
+							ObjectState *os = executor->bindObjectInState(state, mo, isLocal);
+							os->initializeToRandom();
+							executor->bindLocal(ki, state, mo->getBaseExpr());
+							state.currentStack = state.currentThread->stack;
+						}
+					} else {
+						for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end();
+								bit != bie; ++bit) {
+							state.currentStack = (*bit)->stack[state.currentThread->threadId];
+							executor->bindLocal(ki, state, ConstantExpr::alloc(0, Context::get().getPointerWidth()));
+							state.currentStack = state.currentThread->stack;
+						}
+						executor->bindLocal(ki, state, ConstantExpr::alloc(0, Context::get().getPointerWidth()));
+					}
+				}
+				break;
+			}
+
+			case Instruction::Br:
+			case Instruction::Switch: {
+				break;
+			}
+
+			default: {
+				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie;
+						++bit) {
+					state.currentStack = (*bit)->stack[state.currentThread->threadId];
+					executor->executeInstruction(state, ki);
+					state.currentStack = state.currentThread->stack;
+				}
+				break;
+			}
+
+		}
 
 	}
 
@@ -148,6 +313,10 @@ namespace klee {
 		rdManager.allPTSCost.push_back(cost);
 
 		executor->getNewPrefix();
+
+		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+			delete *bit;
+		}
 
 		delete encode;
 		delete dtam;

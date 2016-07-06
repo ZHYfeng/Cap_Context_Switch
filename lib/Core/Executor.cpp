@@ -490,9 +490,9 @@ void Executor::initializeGlobals(ExecutionState &state) {
 	for (Module::const_global_iterator i = m->global_begin(), e = m->global_end(); i != e; ++i) {
 		if (i->hasInitializer()) {
 			MemoryObject *mo = globalObjects.find(i)->second;
-			const ObjectState *os = state.addressSpace.findObject(mo);
+			const ObjectState *os = state.currentStack->addressSpace->findObject(mo);
 			assert(os);
-			ObjectState *wos = state.addressSpace.getWriteable(mo, os);
+			ObjectState *wos = state.currentStack->addressSpace->getWriteable(mo, os);
 
 			initializeGlobalObject(state, wos, i->getInitializer(), 0);
 			// if(i->isConstant()) os->setReadOnly(true);
@@ -2591,7 +2591,6 @@ void Executor::run(ExecutionState &initialState) {
 	searcher = constructUserSearcher(*this);
 	searcher->update(0, states, std::set<ExecutionState*>());
 
-	listenerService->beforeRunMethodAsMain(initialState);
 	handleInitializers(initialState);
 
 	while (!states.empty() && !haltExecution) {
@@ -2694,7 +2693,7 @@ void Executor::run(ExecutionState &initialState) {
 
 		executeInstruction(state, ki);
 
-		listenerService->executeInstruction(state, ki);
+		listenerService->executeInstruction(this, state, ki);
 
 		listenerService->afterExecuteInstruction(state, ki);
 
@@ -2722,8 +2721,6 @@ void Executor::run(ExecutionState &initialState) {
 
 	delete searcher;
 	searcher = 0;
-
-	listenerService->afterRunMethodAsMain();
 
 	dump: if (DumpStatesOnHalt && !states.empty()) {
 		llvm::errs() << "KLEE: halting execution, dumping remaining states\n";
@@ -2755,9 +2752,9 @@ std::string Executor::getAddressInfo(ExecutionState &state, ref<Expr> address) c
 	}
 
 	MemoryObject hack((unsigned) example);
-	MemoryMap::iterator lower = state.addressSpace.objects.upper_bound(&hack);
+	MemoryMap::iterator lower = state.currentStack->addressSpace->objects.upper_bound(&hack);
 	info << "\tnext: ";
-	if (lower == state.addressSpace.objects.end()) {
+	if (lower == state.currentStack->addressSpace->objects.end()) {
 		info << "none\n";
 	} else {
 		const MemoryObject *mo = lower->first;
@@ -2765,10 +2762,10 @@ std::string Executor::getAddressInfo(ExecutionState &state, ref<Expr> address) c
 		mo->getAllocInfo(alloc_info);
 		info << "object at " << mo->address << " of size " << mo->size << "\n" << "\t\t" << alloc_info << "\n";
 	}
-	if (lower != state.addressSpace.objects.begin()) {
+	if (lower != state.currentStack->addressSpace->objects.begin()) {
 		--lower;
 		info << "\tprev: ";
-		if (lower == state.addressSpace.objects.end()) {
+		if (lower == state.currentStack->addressSpace->objects.end()) {
 			info << "none\n";
 		} else {
 			const MemoryObject *mo = lower->first;
@@ -3005,7 +3002,7 @@ ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state, ref<Expr> e) 
 
 ObjectState *Executor::bindObjectInState(ExecutionState &state, const MemoryObject *mo, bool isLocal, const Array *array) {
 	ObjectState *os = array ? new ObjectState(mo, array) : new ObjectState(mo);
-	state.addressSpace.bindObject(mo, os);
+	state.currentStack->addressSpace->bindObject(mo, os);
 
 	// Its possible that multiple bindings of the same mo in the state
 	// will put multiple copies on this list, but it doesn't really
@@ -3037,7 +3034,7 @@ void Executor::executeAlloc(ExecutionState &state, ref<Expr> size, bool isLocal,
 				unsigned count = std::min(reallocFrom->size, os->size);
 				for (unsigned i = 0; i < count; i++)
 					os->write(i, reallocFrom->read8(i));
-				state.addressSpace.unbindObject(reallocFrom->getObject());
+				state.currentStack->addressSpace->unbindObject(reallocFrom->getObject());
 			}
 		}
 	} else {
@@ -3127,7 +3124,7 @@ void Executor::executeFree(ExecutionState &state, ref<Expr> address, KInstructio
 			} else if (mo->isGlobal) {
 				terminateStateOnError(*it->second, "free of global", "free.err", getAddressInfo(*it->second, address));
 			} else {
-				it->second->addressSpace.unbindObject(mo);
+				it->second->currentStack->addressSpace->unbindObject(mo);
 				if (target)
 					bindLocal(target, *it->second, Expr::createPointer(0));
 			}
@@ -3138,7 +3135,7 @@ void Executor::executeFree(ExecutionState &state, ref<Expr> address, KInstructio
 void Executor::resolveExact(ExecutionState &state, ref<Expr> p, ExactResolutionList &results, const std::string &name) {
 	// XXX we may want to be capping this?
 	ResolutionList rl;
-	state.addressSpace.resolve(state, solver, p, rl);
+	state.currentStack->addressSpace->resolve(state, solver, p, rl);
 
 	ExecutionState *unbound = &state;
 	for (ResolutionList::iterator it = rl.begin(), ie = rl.end(); it != ie; ++it) {
@@ -3175,9 +3172,9 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite, ref<E
 	ObjectPair op;
 	bool success;
 	solver->setTimeout(coreSolverTimeout);
-	if (!state.addressSpace.resolveOne(state, solver, address, op, success)) {
+	if (!state.currentStack->addressSpace->resolveOne(state, solver, address, op, success)) {
 		address = toConstant(state, address, "resolveOne failure");
-		success = state.addressSpace.resolveOne(cast<ConstantExpr>(address), op);
+		success = state.currentStack->addressSpace->resolveOne(cast<ConstantExpr>(address), op);
 	}
 	solver->setTimeout(0);
 
@@ -3206,7 +3203,7 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite, ref<E
 				if (os->readOnly) {
 					terminateStateOnError(state, "memory error: object read only", "readonly.err");
 				} else {
-					ObjectState *wos = state.addressSpace.getWriteable(mo, os);
+					ObjectState *wos = state.currentStack->addressSpace->getWriteable(mo, os);
 					wos->write(offset, value);
 				}
 			} else {
@@ -3227,7 +3224,7 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite, ref<E
 
 	ResolutionList rl;
 	solver->setTimeout(coreSolverTimeout);
-	bool incomplete = state.addressSpace.resolve(state, solver, address, rl, 0, coreSolverTimeout);
+	bool incomplete = state.currentStack->addressSpace->resolve(state, solver, address, rl, 0, coreSolverTimeout);
 	solver->setTimeout(0);
 
 	// XXX there is some query wasteage here. who cares?
@@ -3247,7 +3244,7 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite, ref<E
 				if (os->readOnly) {
 					terminateStateOnError(*bound, "memory error: object read only", "readonly.err");
 				} else {
-					ObjectState *wos = bound->addressSpace.getWriteable(mo, os);
+					ObjectState *wos = bound->currentStack->addressSpace->getWriteable(mo, os);
 					wos->write(mo->getOffsetExpr(address), value);
 				}
 			} else {
@@ -3419,7 +3416,11 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv, char **envp
 
 	processTree = new PTree(state);
 	state->ptreeNode = processTree->root;
+
+	listenerService->beforeRunMethodAsMain(*state);
+
 	run(*state);
+
 	delete processTree;
 	processTree = 0;
 
@@ -3432,6 +3433,8 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv, char **envp
 
 	if (statsTracker)
 		statsTracker->done();
+
+	listenerService->afterRunMethodAsMain();
 }
 
 unsigned Executor::getPathStreamID(const ExecutionState &state) {
@@ -3578,12 +3581,12 @@ Interpreter *Interpreter::create(const InterpreterOptions &opts, InterpreterHand
 /**
  * 获取address对应的ObjectPair
  */
-bool Executor::getMemoryObject(ObjectPair& op, ExecutionState& state, ref<Expr> address) {
+bool Executor::getMemoryObject(ObjectPair& op, ExecutionState& state, AddressSpace *addressSpace, ref<Expr> address) {
 	TimingSolver* solver = getTimeSolver();
 	bool success;
-	if (!state.currentStack->addressSpace->resolveOne(state, solver, address, op, success)) {
+	if (!addressSpace->resolveOne(state, solver, address, op, success)) {
 		address = toConstant(state, address, "resolveOne failure");
-		success = state.currentStack->addressSpace->resolveOne(cast<ConstantExpr>(address), op);
+		success = addressSpace->resolveOne(cast<ConstantExpr>(address), op);
 	}
 	return success;
 }

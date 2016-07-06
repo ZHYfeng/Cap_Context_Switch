@@ -90,8 +90,7 @@ namespace klee {
 			friend class PSOListener;
 			friend class SymbolicListener;
 			friend class TaintListener;
-			friend class TestListener;
-			friend class CondManager;
+//			friend class CondManager;
 
 		public:
 			class Timer {
@@ -475,7 +474,7 @@ namespace klee {
 
 			Expr::Width getWidthForLLVMType(LLVM_TYPE_Q llvm::Type *type) const;
 
-			bool getMemoryObject(ObjectPair& op, ExecutionState& state, ref<Expr> address);
+			bool getMemoryObject(ObjectPair& op, ExecutionState& state, AddressSpace *addressSpace, ref<Expr> address);
 
 			bool isGlobalMO(const MemoryObject* mo);
 

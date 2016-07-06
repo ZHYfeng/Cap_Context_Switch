@@ -32,7 +32,7 @@ namespace klee {
 	class TaintListener: public BitcodeListener {
 		public:
 			TaintListener(Executor* executor, RuntimeDataManager* rdManager);
-			~TaintListener();
+			virtual ~TaintListener();
 
 			void beforeRunMethodAsMain(ExecutionState &initialState);
 			void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki);
@@ -42,14 +42,13 @@ namespace klee {
 
 		private:
 			Executor* executor;
-			RuntimeDataManager* runtimeData;
+			std::vector<Event*>::iterator currentEvent;
 			FilterSymbolicExpr filter;
-			std::vector<Event*>::iterator currentEvent, endEvent;
+
+
 			//此Map更新有两处，Load、某些函数。
 			std::map<ref<Expr>, ref<Expr> > addressSymbolicMap;
 			std::map<std::string, ref<Expr> > symbolicMap;
-			AddressSpace addressSpace;
-			std::map<unsigned, StackType *> stack;
 
 		private:
 
