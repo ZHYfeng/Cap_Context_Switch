@@ -64,11 +64,13 @@ namespace klee {
 		private:
 			Executor* executor;
 			RuntimeDataManager* rdManager;
+
 			std::stringstream ss;
 			std::map<uint64_t, unsigned> loadRecord;
 			std::map<uint64_t, unsigned> storeRecord;
 			std::map<uint64_t, llvm::Type*> usedGlobalVariableRecord;
 			std::map<uint64_t, BarrierInfo*> barrierRecord;
+
 			AddressSpace addressSpace;
 			std::map<unsigned, StackType*> stack;
 

@@ -18,6 +18,7 @@
 #include "DTAM.h"
 #include "Encode.h"
 #include "Prefix.h"
+#include "PSOListener.h"
 #include "SymbolicListener.h"
 #include "TaintListener.h"
 
@@ -26,9 +27,14 @@ namespace klee {
 	ListenerService::ListenerService(Executor* executor) {
 		encode = NULL;
 		dtam = NULL;
-		runState = 0;
 		cost = 0;
 
+	}
+
+	ListenerService::~ListenerService() {
+		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+			bitcodeListeners.erase(bit);
+		}
 	}
 
 	void ListenerService::pushListener(BitcodeListener* bitcodeListener) {
@@ -38,6 +44,15 @@ namespace klee {
 	void ListenerService::removeListener(BitcodeListener* bitcodeListener) {
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
 			if ((*bit) == bitcodeListener) {
+				bitcodeListeners.erase(bit);
+				break;
+			}
+		}
+	}
+
+	void ListenerService::removeListener(BitcodeListener::listenerKind kind) {
+		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+			if ((*bit)->kind == kind) {
 				bitcodeListeners.erase(bit);
 				break;
 			}
@@ -87,94 +102,55 @@ namespace klee {
 	}
 
 	void ListenerService::startControl(Executor* executor) {
-		runState = rdManager.runState;
-		switch (runState) {
-			case 0: {
-//		BitcodeListener* PSOlistener = new PSOListener(executor, &rdManager);
-//		pushListener(PSOlistener);
-				executor->executionNum++;
-				gettimeofday(&start, NULL);
-				break;
-			}
-			case 1: {
-				BitcodeListener* Symboliclistener = new SymbolicListener(executor, &rdManager);
-				pushListener(Symboliclistener);
-				rdManager.runState = 2;
-				if (executor->prefix) {
-					executor->prefix->reuse();
-				}
-				gettimeofday(&start, NULL);
-				break;
-			}
-			case 2: {
-				BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
-				pushListener(Taintlistener);
-				rdManager.runState = 0;
-				if (executor->prefix) {
-					executor->prefix->reuse();
-				}
-				gettimeofday(&start, NULL);
-				break;
-			}
-			case 3: {
-				break;
-			}
-			default: {
-				break;
-			}
-		}
+
+		executor->executionNum++;
+
+		BitcodeListener* PSOlistener = new PSOListener(executor, &rdManager);
+		pushListener(PSOlistener);
+		BitcodeListener* Symboliclistener = new SymbolicListener(executor, &rdManager);
+		pushListener(Symboliclistener);
+		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
+		pushListener(Taintlistener);
+
+		gettimeofday(&start, NULL);
+
 	}
 
 	void ListenerService::endControl(Executor* executor) {
-		switch (runState) {
-			case 0: {
-				popListener();
-				gettimeofday(&finish, NULL);
-				cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-				rdManager.runningCost += cost;
-				break;
-			}
-			case 1: {
-				popListener();
-				encode = new Encode(&rdManager);
-				encode->buildifAndassert();
-				if (encode->verify()) {
-					encode->check_if();
-				}
-				gettimeofday(&finish, NULL);
-				cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-				rdManager.solvingCost += cost;
-				break;
-			}
-			case 2: {
-				popListener();
-				gettimeofday(&finish, NULL);
-				cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-				rdManager.TaintCost += cost;
-				rdManager.allTaintCost.push_back(cost);
 
-				gettimeofday(&start, NULL);
-				dtam = new DTAM(&rdManager);
-				dtam->dtam();
-				gettimeofday(&finish, NULL);
-				cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-				rdManager.DTAMCost += cost;
-				rdManager.allDTAMCost.push_back(cost);
+		gettimeofday(&finish, NULL);
+		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+		rdManager.runningCost += cost;
 
-				gettimeofday(&start, NULL);
-				encode->PTS();
-				gettimeofday(&finish, NULL);
-				cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-				rdManager.PTSCost += cost;
-				rdManager.allPTSCost.push_back(cost);
-
-				executor->getNewPrefix();
-				break;
-			}
-			default: {
-				break;
-			}
+		gettimeofday(&start, NULL);
+		encode = new Encode(&rdManager);
+		encode->buildifAndassert();
+		if (encode->verify()) {
+			encode->check_if();
 		}
+		gettimeofday(&finish, NULL);
+		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+		rdManager.solvingCost += cost;
+
+		gettimeofday(&start, NULL);
+		dtam = new DTAM(&rdManager);
+		dtam->dtam();
+		gettimeofday(&finish, NULL);
+		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+		rdManager.DTAMCost += cost;
+		rdManager.allDTAMCost.push_back(cost);
+
+		gettimeofday(&start, NULL);
+		encode->PTS();
+		gettimeofday(&finish, NULL);
+		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+		rdManager.PTSCost += cost;
+		rdManager.allPTSCost.push_back(cost);
+
+		executor->getNewPrefix();
+
+		delete encode;
+		delete dtam;
 
 	}
 

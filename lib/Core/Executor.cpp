@@ -4041,7 +4041,7 @@ void Executor::handleInitializers(ExecutionState& initialState) {
  */
 void Executor::createSpecialElement(ExecutionState& state, Type* type, uint64_t& startAddress, bool isInitializer) {
 
-	std::cerr << "type : " << type->getTypeID() << std::endl;
+//	std::cerr << "type : " << type->getTypeID() << std::endl;
 
 	switch (type->getTypeID()) {
 

@@ -46,7 +46,7 @@ namespace klee {
 
 SymbolicListener::SymbolicListener(Executor* executor, RuntimeDataManager* rdManager) :
 		BitcodeListener(), executor(executor), runtimeData(rdManager) {
-	Kind = SymbolicListenerKind;
+	kind = SymbolicListenerKind;
 	kleeBr = false;
 }
 

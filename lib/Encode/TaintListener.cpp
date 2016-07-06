@@ -46,7 +46,7 @@ namespace klee {
 
 TaintListener::TaintListener(Executor* executor, RuntimeDataManager* rdManager) :
 		BitcodeListener(), executor(executor), runtimeData(rdManager) {
-	Kind = TaintListenerKind;
+	kind = TaintListenerKind;
 }
 
 TaintListener::~TaintListener() {

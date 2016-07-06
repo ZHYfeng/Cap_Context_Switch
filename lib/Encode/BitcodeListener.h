@@ -23,7 +23,7 @@ class BitcodeListener {
 			DebugerListenerKind
 		};
 
-		listenerKind Kind;
+		listenerKind kind;
 
 		virtual ~BitcodeListener();
 		virtual void beforeRunMethodAsMain(ExecutionState &initialState) = 0;

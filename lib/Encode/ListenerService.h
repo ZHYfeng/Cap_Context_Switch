@@ -28,16 +28,16 @@ namespace klee {
 			RuntimeDataManager rdManager;
 			Encode *encode;
 			DTAM *dtam;
-			unsigned runState;
 			struct timeval start, finish;
 			double cost;
 
 		public:
 			ListenerService(Executor* executor);
-			~ListenerService() {
-			}
+			~ListenerService();
+
 			void pushListener(BitcodeListener* bitcodeListener);
 			void removeListener(BitcodeListener* bitcodeListener);
+			void removeListener(BitcodeListener::listenerKind kind);
 			void popListener();
 
 			RuntimeDataManager* getRuntimeDataManager();

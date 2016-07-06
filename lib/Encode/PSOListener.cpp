@@ -41,7 +41,7 @@ namespace klee {
 	PSOListener::PSOListener(Executor* executor, RuntimeDataManager* rdManager) :
 			BitcodeListener(), executor(executor), rdManager(rdManager) {
 		// TODO Auto-generated constructor stub
-		Kind = PSOListenerKind;
+		kind = PSOListenerKind;
 	}
 
 	PSOListener::~PSOListener() {
@@ -61,6 +61,7 @@ namespace klee {
 		rdManager->createNewTrace(executor->executionNum);
 		for (Module::global_iterator i = m->global_begin(), e = m->global_end(); i != e; ++i) {
 			if (i->hasInitializer() && i->getName().str().at(0) != '.') {
+//				std::cerr << "name : " << i->getName().str() << "\n";
 				MemoryObject *mo = executor->globalObjects.find(i)->second;
 				Constant* initializer = i->getInitializer();
 				uint64_t address = mo->address;
@@ -822,13 +823,16 @@ namespace klee {
 
 				case Type::StructTyID: {
 					StructType* structType = dyn_cast<StructType>(caggregate->getType());
-					if (structType->getStructName() == "union.pthread_mutex_t" || structType->getStructName() == "union.pthread_cond_t"
-							|| structType->getStructName() == "union.pthread_barrier_t") {
-						unsigned alignment = layout->getABITypeAlignment(structType);
-						if (startAddress % alignment != 0) {
-							startAddress = (startAddress / alignment + 1) * alignment;
+					if (!structType->isLiteral()) {
+						if (structType->getStructName() == "union.pthread_mutex_t" || structType->getStructName() == "union.pthread_cond_t"
+								|| structType->getStructName() == "union.pthread_barrier_t") {
+							unsigned alignment = layout->getABITypeAlignment(structType);
+							if (startAddress % alignment != 0) {
+								startAddress = (startAddress / alignment + 1) * alignment;
+							}
+							startAddress += executor->kmodule->targetData->getTypeSizeInBits(structType) / 8;
 						}
-						startAddress += executor->kmodule->targetData->getTypeSizeInBits(structType) / 8;
+
 					} else {
 						elementNum = caggregate->getType()->getStructNumElements();
 						for (unsigned index = 0; index < elementNum; index++) {
@@ -866,13 +870,15 @@ namespace klee {
 			}
 		} else if (ConstantStruct* cstruct = dyn_cast<ConstantStruct>(initializer)) {
 			StructType* structType = cstruct->getType();
-			if (structType->getStructName() == "union.pthread_mutex_t" || structType->getStructName() == "union.pthread_cond_t"
-					|| structType->getStructName() == "union.pthread_barrier_t") {
-				unsigned alignment = layout->getABITypeAlignment(structType);
-				if (startAddress % alignment != 0) {
-					startAddress = (startAddress / alignment + 1) * alignment;
+			if (!structType->isLiteral()) {
+				if (structType->getStructName() == "union.pthread_mutex_t" || structType->getStructName() == "union.pthread_cond_t"
+						|| structType->getStructName() == "union.pthread_barrier_t") {
+					unsigned alignment = layout->getABITypeAlignment(structType);
+					if (startAddress % alignment != 0) {
+						startAddress = (startAddress / alignment + 1) * alignment;
+					}
+					startAddress += executor->kmodule->targetData->getTypeSizeInBits(structType) / 8;
 				}
-				startAddress += executor->kmodule->targetData->getTypeSizeInBits(structType) / 8;
 			} else {
 				uint64_t elementNum = structType->getNumElements();
 				for (unsigned index = 0; index < elementNum; index++) {
@@ -899,7 +905,7 @@ namespace klee {
 			}
 		} else {
 			cerr << "value = " << initializer->getValueID() << " type = " << initializer->getType()->getTypeID() << endl;
-			assert(0 && "unsupported initializer");
+//			assert(0 && "unsupported initializer");
 		}
 	}
 
@@ -918,7 +924,7 @@ namespace klee {
 
 			default: {
 				cerr << expr->getOpcode() << endl;
-				assert(0 && "unsupported Opcode");
+//				assert(0 && "unsupported Opcode");
 			}
 
 		}

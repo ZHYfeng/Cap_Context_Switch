@@ -45,12 +45,15 @@ namespace klee {
 			Executor* executor;
 			RuntimeDataManager* runtimeData;
 			FilterSymbolicExpr filter;
+
 			std::vector<Event*>::iterator currentEvent, endEvent;
+
 			//此Map更新有两处，Load、某些函数。
 			std::map<ref<Expr>, ref<Expr> > addressSymbolicMap;
 			std::map<std::string, std::vector<unsigned> > assertMap;
 			std::map<std::string, ref<Expr> > symbolicMap;
 			bool kleeBr;
+
 			AddressSpace addressSpace;
 			std::map<unsigned, StackType *> stack;
 
