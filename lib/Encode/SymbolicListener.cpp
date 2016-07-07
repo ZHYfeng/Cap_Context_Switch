@@ -545,7 +545,7 @@ namespace klee {
 	}
 
 //消息响应函数，在被测程序解释执行之后调用
-	void SymbolicListener::afterRunMethodAsMain() {
+	void SymbolicListener::afterRunMethodAsMain(ExecutionState &state) {
 		symbolicMap.clear();
 		addressSymbolicMap.clear();
 		assertMap.clear();

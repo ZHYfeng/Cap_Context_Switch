@@ -59,45 +59,6 @@ namespace klee {
 
 		Module* m = executor->kmodule->module;
 		rdManager->createNewTrace(executor->executionNum);
-		initialState.currentStack = stack[initialState.currentThread->threadId];
-
-		// allocate memory objects for all globals
-		for (Module::const_global_iterator i = m->global_begin(), e = m->global_end(); i != e; ++i) {
-			if (i->isDeclaration()) {
-
-				LLVM_TYPE_Q Type *ty = i->getType()->getElementType();
-				uint64_t size = executor->kmodule->targetData->getTypeStoreSize(ty);
-
-				MemoryObject *mo = executor->globalObjects.find(i)->second;
-				ObjectState *os = executor->bindObjectInState(initialState, mo, false);
-
-				if (size) {
-					void *addr;
-					if (i->getName() == "__dso_handle") {
-						addr = &__dso_handle; // wtf ?
-					} else {
-						addr = executor->externalDispatcher->resolveSymbol(i->getName());
-					}
-					for (unsigned offset = 0; offset < mo->size; offset++)
-						os->write8(offset, ((unsigned char*) addr)[offset]);
-				}
-			} else {
-				MemoryObject *mo = executor->globalObjects.find(i)->second;
-				ObjectState *os = executor->bindObjectInState(initialState, mo, false);
-
-				if (!i->hasInitializer())
-					os->initializeToRandom();
-			}
-		}
-		// once all objects are allocated, do the actual initialization
-		for (Module::const_global_iterator i = m->global_begin(), e = m->global_end(); i != e; ++i) {
-			if (i->hasInitializer()) {
-				MemoryObject *mo = executor->globalObjects.find(i)->second;
-				const ObjectState *os = initialState.currentStack->addressSpace->findObject(mo);
-				ObjectState *wos = initialState.currentStack->addressSpace->getWriteable(mo, os);
-				executor->initializeGlobalObject(initialState, wos, i->getInitializer(), 0);
-			}
-		}
 
 		//收集全局变量初始化值
 		for (Module::global_iterator i = m->global_begin(), e = m->global_end(); i != e; ++i) {
@@ -216,7 +177,7 @@ namespace klee {
 //			}
 					ref<Expr> pthreadAddress = executor->eval(ki, 1, state).value;
 					ObjectPair pthreadop;
-					bool success = executor->getMemoryObject(pthreadop, state, pthreadAddress);
+					bool success = executor->getMemoryObject(pthreadop, state, , pthreadAddress);
 					if (success) {
 //				const ObjectState* pthreados = pthreadop.second;
 						const MemoryObject* pthreadmo = pthreadop.first;
@@ -782,7 +743,7 @@ namespace klee {
 	}
 
 //消息响应函数，在被测程序解释执行之后调用
-	void PSOListener::afterRunMethodAsMain() {
+	void PSOListener::afterRunMethodAsMain(ExecutionState &state) {
 		Trace* trace = rdManager->getCurrentTrace();
 		unsigned allGlobal = 0;
 		if (executor->execStatus != Executor::SUCCESS) {

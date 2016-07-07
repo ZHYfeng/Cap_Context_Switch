@@ -3417,7 +3417,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv, char **envp
 	processTree = new PTree(state);
 	state->ptreeNode = processTree->root;
 
-	listenerService->beforeRunMethodAsMain(*state);
+	listenerService->beforeRunMethodAsMain(this, *state);
 
 	run(*state);
 
@@ -3434,7 +3434,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv, char **envp
 	if (statsTracker)
 		statsTracker->done();
 
-	listenerService->afterRunMethodAsMain();
+	listenerService->afterRunMethodAsMain(*state);
 }
 
 unsigned Executor::getPathStreamID(const ExecutionState &state) {

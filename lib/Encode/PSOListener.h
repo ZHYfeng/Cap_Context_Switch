@@ -47,7 +47,7 @@ namespace klee {
 			void beforeRunMethodAsMain(ExecutionState &initialState);
 			void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki);
 			void afterExecuteInstruction(ExecutionState &state, KInstruction *ki);
-			void afterRunMethodAsMain();
+			void afterRunMethodAsMain(ExecutionState &state);
 			void executionFailed(ExecutionState &state, KInstruction *ki);
 
 		private:

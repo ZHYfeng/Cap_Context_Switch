@@ -37,10 +37,10 @@ class BitcodeListener {
 		AddressSpace addressSpace;
 		std::map<unsigned, StackType*> stack;
 
-		virtual void beforeRunMethodAsMain(ExecutionState &initialState) = 0;
+		virtual void beforeRunMethodAsMain(ExecutionState &state) = 0;
 		virtual void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki) = 0;
 		virtual void afterExecuteInstruction(ExecutionState &state, KInstruction *ki) = 0;
-		virtual void afterRunMethodAsMain() = 0;
+		virtual void afterRunMethodAsMain(ExecutionState &state) = 0;
 		virtual void executionFailed(ExecutionState &state, KInstruction *ki) = 0;
 
 

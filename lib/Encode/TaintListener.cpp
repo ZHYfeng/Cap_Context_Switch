@@ -507,7 +507,7 @@ namespace klee {
 	}
 
 //消息响应函数，在被测程序解释执行之后调用
-	void TaintListener::afterRunMethodAsMain() {
+	void TaintListener::afterRunMethodAsMain(ExecutionState &state) {
 		cerr << "######################taint analysis####################\n";
 
 	}

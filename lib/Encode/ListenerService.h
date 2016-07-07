@@ -43,10 +43,10 @@ namespace klee {
 			RuntimeDataManager* getRuntimeDataManager();
 
 			void Preparation();
-			void beforeRunMethodAsMain(ExecutionState &initialState);
+			void beforeRunMethodAsMain(Executor* executor, ExecutionState &state);
 			void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki);
 			void afterExecuteInstruction(ExecutionState &state, KInstruction *ki);
-			void afterRunMethodAsMain();
+			void afterRunMethodAsMain(ExecutionState &state);
 			void executionFailed(ExecutionState &state, KInstruction *ki);
 
 			void executeInstruction(Executor* executor, ExecutionState &state, KInstruction *ki);

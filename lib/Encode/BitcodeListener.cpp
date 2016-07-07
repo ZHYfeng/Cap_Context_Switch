@@ -10,7 +10,7 @@
 namespace klee {
 
 	BitcodeListener::BitcodeListener(RuntimeDataManager* rdManager) :
-			kind(0), rdManager(rdManager) {
+			kind(defaultKind), rdManager(rdManager) {
 
 	}
 
