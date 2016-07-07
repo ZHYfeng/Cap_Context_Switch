@@ -44,7 +44,7 @@ using namespace llvm;
 namespace klee {
 
 	SymbolicListener::SymbolicListener(Executor* executor, RuntimeDataManager* rdManager) :
-			BitcodeListener(), executor(executor), runtimeData(rdManager) {
+		BitcodeListener(rdManager), executor(executor) {
 		kind = SymbolicListenerKind;
 		kleeBr = false;
 	}
@@ -56,7 +56,7 @@ namespace klee {
 //消息响应函数，在被测程序解释执行之前调用
 	void SymbolicListener::beforeRunMethodAsMain(ExecutionState &initialState) {
 
-		Trace* trace = runtimeData->getCurrentTrace();
+		Trace* trace = rdManager->getCurrentTrace();
 		currentEvent = trace->path.begin();
 
 		//收集assert
@@ -84,7 +84,7 @@ namespace klee {
 	}
 
 	void SymbolicListener::beforeExecuteInstruction(ExecutionState &state, KInstruction *ki) {
-		Trace* trace = runtimeData->getCurrentTrace();
+		Trace* trace = rdManager->getCurrentTrace();
 		if ((*currentEvent)) {
 			Instruction* inst = ki->inst;
 //		Thread* thread = state.currentThread;
@@ -369,7 +369,7 @@ namespace klee {
 	}
 
 	void SymbolicListener::afterExecuteInstruction(ExecutionState &state, KInstruction *ki) {
-		Trace* trace = runtimeData->getCurrentTrace();
+		Trace* trace = rdManager->getCurrentTrace();
 		if ((*currentEvent)) {
 			Instruction* inst = ki->inst;
 			Thread* thread = state.currentThread;
@@ -504,7 +504,7 @@ namespace klee {
 					} else if (f->getName() == "pthread_create") {
 						ref<Expr> pthreadAddress = executor->eval(ki, 1, state).value;
 						ObjectPair pthreadop;
-						executor->getMemoryObject(pthreadop, state, pthreadAddress);
+						executor->getMemoryObject(pthreadop, state, state.currentStack->addressSpace, pthreadAddress);
 						const ObjectState* pthreados = pthreadop.second;
 						const MemoryObject* pthreadmo = pthreadop.first;
 						Expr::Width size = BIT_WIDTH;
@@ -560,7 +560,7 @@ namespace klee {
 
 //消息相应函数，在前缀执行出错之后程序推出之前调用
 	void SymbolicListener::executionFailed(ExecutionState &state, KInstruction *ki) {
-		runtimeData->getCurrentTrace()->traceType = Trace::FAILED;
+		rdManager->getCurrentTrace()->traceType = Trace::FAILED;
 	}
 
 	ref<Expr> SymbolicListener::manualMakeSymbolic(ExecutionState& state, std::string name, unsigned size, bool isFloat) {
@@ -585,7 +585,7 @@ namespace klee {
 
 	ref<Expr> SymbolicListener::readExpr(ExecutionState &state, ref<Expr> address, Expr::Width size) {
 		ObjectPair op;
-		executor->getMemoryObject(op, state, address);
+		executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 		const MemoryObject *mo = op.first;
 		ref<Expr> offset = mo->getOffsetExpr(address);
 		const ObjectState *os = op.second;

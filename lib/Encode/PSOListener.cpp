@@ -118,12 +118,8 @@ namespace klee {
 					uint64_t functionPtr = constExpr->getZExtValue();
 					f = (Function*) functionPtr;
 				}
-//		if (executor->kmodule->functionMap.find(f) == executor->kmodule->functionMap.end()) {
-//			assert(0 && "function not exist");
-//		}
 				item->calledFunction = f;
-				if (f && f->isDeclaration() && f->getIntrinsicID() == Intrinsic::not_intrinsic
-						&& kmodule->internalFunctions.find(f) == kmodule->internalFunctions.end()) {
+				if (f && f->isDeclaration() && f->getIntrinsicID() == Intrinsic::not_intrinsic && kmodule->internalFunctions.find(f) == kmodule->internalFunctions.end()) {
 					item->isFunctionWithSourceCode = false;
 				}
 //		std::cerr<<"isFunctionWithSourceCode : "<<item->isFunctionWithSourceCode<<"\n";
@@ -138,46 +134,10 @@ namespace klee {
 					}
 				}
 //		std::cerr<<"call name : "<< f->getName().str().c_str() <<"\n";
-//		if(f->getName().str() == "open"){
-//			cerr<<f->getName().str()<<"\n";
-//			ref<Expr> Address = executor->eval(ki, 1, state).value;
-//			ObjectPair op;
-//			executor->getMemoryObject(op, state, Address);
-//			const ObjectState* destos = op.second;
-//			const MemoryObject* mo = op.first;
-//			Expr::Width size = 8;
-//			int i = 0;
-//			for ( ; i < mo->size; i++) {
-//				ref<Expr> value = destos->read(i, size);
-//				if(value->isZero()){
-//					break;
-//				}
-//						ConstantExpr *value1 = cast<ConstantExpr>(value);
-//						uint64_t scraddress = value1->getZExtValue();
-//						char valuec = scraddress;
-//					std::cerr<<"value : "<<valuec<<std::endl;
-//			}
-//		}
 				if (f->getName().str() == "pthread_create") {
-//			CallInst* calli = dyn_cast<CallInst>(inst);
-//			assert(
-//					calli->getNumArgOperands() == 4
-//							&& "pthread_create has 4 params");
-//			Value* threadEntranceFP = calli->getArgOperand(2);
-//			Function *threadEntrance = executor->getTargetFunction(
-//					threadEntranceFP, state);
-//			if (!threadEntrance) {
-//				ref<Expr> param = executor->eval(ki, 3, state).value;
-//				ConstantExpr* functionPtr = dyn_cast<ConstantExpr>(param);
-//				threadEntrance = (Function*)(functionPtr->getZExtValue());
-//				//assert(0 && "thread entrance not exist");
-//				//						KFunction *kf =
-//				//								executor->kmodule->functionMap[threadEntrance];
-//				//runtime.pushStackFrame(kf->function, kf->numRegisters, executor->nextThreadId);
-//			}
 					ref<Expr> pthreadAddress = executor->eval(ki, 1, state).value;
 					ObjectPair pthreadop;
-					bool success = executor->getMemoryObject(pthreadop, state, , pthreadAddress);
+					bool success = executor->getMemoryObject(pthreadop, state, state.currentStack->addressSpace, pthreadAddress);
 					if (success) {
 //				const ObjectState* pthreados = pthreadop.second;
 						const MemoryObject* pthreadmo = pthreadop.first;
@@ -211,7 +171,7 @@ namespace klee {
 					bool success;
 					//get lock
 					param = executor->eval(ki, 2, state).value;
-					success = executor->getMemoryObject(op, state, param);
+					success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, param);
 					if (success) {
 						const MemoryObject* mo = op.first;
 						string mutexName = createVarName(mo->id, param, executor->isGlobalMO(mo));
@@ -233,7 +193,7 @@ namespace klee {
 					}
 					//get cond
 					param = executor->eval(ki, 1, state).value;
-					success = executor->getMemoryObject(op, state, param);
+					success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, param);
 					if (success) {
 						const MemoryObject* mo = op.first;
 						string condName = createVarName(mo->id, param, executor->isGlobalMO(mo));
@@ -249,7 +209,7 @@ namespace klee {
 				} else if (f->getName().str() == "pthread_cond_signal") {
 					ref<Expr> param = executor->eval(ki, 1, state).value;
 					ObjectPair op;
-					bool success = executor->getMemoryObject(op, state, param);
+					bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, param);
 					if (success) {
 						const MemoryObject* mo = op.first;
 						string condName = createVarName(mo->id, param, executor->isGlobalMO(mo));
@@ -265,7 +225,7 @@ namespace klee {
 				} else if (f->getName().str() == "pthread_cond_broadcast") {
 					ref<Expr> param = executor->eval(ki, 1, state).value;
 					ObjectPair op;
-					bool success = executor->getMemoryObject(op, state, param);
+					bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, param);
 					if (success) {
 						const MemoryObject* mo = op.first;
 						string condName = createVarName(mo->id, param, executor->isGlobalMO(mo));
@@ -281,7 +241,7 @@ namespace klee {
 				} else if (f->getName().str() == "pthread_mutex_lock") {
 					ref<Expr> param = executor->eval(ki, 1, state).value;
 					ObjectPair op;
-					bool success = executor->getMemoryObject(op, state, param);
+					bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, param);
 					if (success) {
 						const MemoryObject* mo = op.first;
 						string mutexName = createVarName(mo->id, param, executor->isGlobalMO(mo));
@@ -292,7 +252,7 @@ namespace klee {
 				} else if (f->getName().str() == "pthread_mutex_unlock") {
 					ref<Expr> param = executor->eval(ki, 1, state).value;
 					ObjectPair op;
-					bool success = executor->getMemoryObject(op, state, param);
+					bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, param);
 					if (success) {
 						const MemoryObject* mo = op.first;
 						string mutexName = createVarName(mo->id, param, executor->isGlobalMO(mo));
@@ -377,7 +337,7 @@ namespace klee {
 					if (realAddress) {
 						uint64_t key = realAddress->getZExtValue();
 						ObjectPair op;
-						bool success = executor->getMemoryObject(op, state, address);
+						bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 						if (success) {
 							const MemoryObject *mo = op.first;
 							if (executor->isGlobalMO(mo)) {
@@ -431,8 +391,7 @@ namespace klee {
 				//ylc
 				GetElementPtrInst* gp = dyn_cast<GetElementPtrInst>(inst);
 				KGEPInstruction *kgepi = static_cast<KGEPInstruction*>(ki);
-				for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie;
-						++it) {
+				for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie; ++it) {
 					ref<Expr> index = executor->eval(ki, it->first, state).value;
 //			std::cerr << "kgepi->index : " << index << std::endl;
 					item->instParameter.push_back(index);
@@ -480,8 +439,7 @@ namespace klee {
 							uint64_t startAddress = base + index * elementBitWidth / 8;
 							ObjectPair op;
 //				cerr << "base = " << base << " index = " << index << " startAddress = " << startAddress << " pointerWidth = " << Context::get().getPointerWidth() << endl;
-							bool success = executor->getMemoryObject(op, state,
-									ConstantExpr::create(startAddress, Context::get().getPointerWidth()));
+							bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, ConstantExpr::create(startAddress, Context::get().getPointerWidth()));
 							if (success) {
 								const MemoryObject* mo = op.first;
 								uint64_t elementNum = mo->size / (elementBitWidth / 8);
@@ -547,7 +505,7 @@ namespace klee {
 //				cerr << "load value : " << value << "\n";
 						uint64_t key = realAddress->getZExtValue();
 						ObjectPair op;
-						bool success = executor->getMemoryObject(op, state, address);
+						bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 						if (success) {
 							const MemoryObject *mo = op.first;
 							if (executor->isGlobalMO(mo)) {
@@ -605,7 +563,7 @@ namespace klee {
 				if (realAddress) {
 					uint64_t key = realAddress->getZExtValue();
 					ObjectPair op;
-					bool success = executor->getMemoryObject(op, state, address);
+					bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 					if (success) {
 						const MemoryObject *mo = op.first;
 						if (executor->isGlobalMO(mo)) {
@@ -1007,7 +965,7 @@ namespace klee {
 			ref<Expr> destAddress = executor->eval(ki, 1, state).value;
 			ObjectPair destop;
 			//处理dest
-			executor->getMemoryObject(destop, state, destAddress);
+			executor->getMemoryObject(destop, state, state.currentStack->addressSpace, destAddress);
 			const MemoryObject* destmo = destop.first;
 			const ObjectState* destos = destop.second;
 			ConstantExpr *caddress = cast<ConstantExpr>(destAddress);
@@ -1038,21 +996,21 @@ namespace klee {
 			ref<Expr> address = executor->eval(ki, 2, state).value;
 			ObjectPair op;
 			Type* type = inst->getOperand(1)->getType()->getPointerElementType();
-			executor->getMemoryObject(op, state, address);
+			executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 			uint64_t start = dyn_cast<ConstantExpr>(address)->getZExtValue();
 			analyzeInputValue(start, op, type);
 		} else if (f->getName() == "lstat") {
 			ref<Expr> address = executor->eval(ki, 2, state).value;
 			ObjectPair op;
 			Type* type = inst->getOperand(1)->getType()->getPointerElementType();
-			executor->getMemoryObject(op, state, address);
+			executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 			uint64_t start = dyn_cast<ConstantExpr>(address)->getZExtValue();
 			analyzeInputValue(start, op, type);
 		} else if (f->getName() == "time") {
 			ref<Expr> address = executor->eval(ki, 1, state).value;
 			ObjectPair op;
 			Type* type = inst->getOperand(0)->getType()->getPointerElementType();
-			executor->getMemoryObject(op, state, address);
+			executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 			uint64_t start = dyn_cast<ConstantExpr>(address)->getZExtValue();
 			analyzeInputValue(start, op, type);
 		}

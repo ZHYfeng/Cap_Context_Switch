@@ -45,7 +45,7 @@ using namespace llvm;
 namespace klee {
 
 	TaintListener::TaintListener(Executor* executor, RuntimeDataManager* rdManager) :
-			BitcodeListener(), executor(executor), runtimeData(rdManager) {
+			BitcodeListener(rdManager), executor(executor) {
 		kind = TaintListenerKind;
 	}
 
@@ -57,14 +57,14 @@ namespace klee {
 //消息响应函数，在被测程序解释执行之前调用
 	void TaintListener::beforeRunMethodAsMain(ExecutionState &initialState) {
 
-		Trace* trace = runtimeData->getCurrentTrace();
+		Trace* trace = rdManager->getCurrentTrace();
 		currentEvent = trace->path.begin();
 	}
 
 	void TaintListener::beforeExecuteInstruction(ExecutionState &state, KInstruction *ki) {
-		Trace* trace = runtimeData->getCurrentTrace();
+		Trace* trace = rdManager->getCurrentTrace();
 		Instruction* inst = ki->inst;
-		Thread* thread = state.currentThread;
+//		Thread* thread = state.currentThread;
 //	std::cerr << "thread id : " << thread->threadId << " ";
 //	inst->dump();
 		if ((*currentEvent)) {
@@ -195,7 +195,7 @@ namespace klee {
 //				cerr << "name : " << *it << " isTaint : " << (*it)->isTaint << "\n";
 //			}
 					ObjectPair op;
-					executor->getMemoryObject(op, state, address);
+					executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 					const MemoryObject *mo = op.first;
 					const ObjectState *os = op.second;
 					ObjectState *wos = state.currentStack->addressSpace->getWriteable(mo, os);
@@ -236,8 +236,7 @@ namespace klee {
 
 							//编码tp
 							ref<Expr> temp = ConstantExpr::create(0, size);
-							for (std::vector<ref<klee::Expr> >::iterator it = relatedSymbolicExpr->begin();
-									it != relatedSymbolicExpr->end(); it++) {
+							for (std::vector<ref<klee::Expr> >::iterator it = relatedSymbolicExpr->begin(); it != relatedSymbolicExpr->end(); it++) {
 								string varFullName = filter.getGlobalName(*it);
 								ref<Expr> orExpr = manualMakeTaintSymbolic(state, varFullName, size);
 								temp = OrExpr::create(temp, orExpr);
@@ -317,8 +316,7 @@ namespace klee {
 						assert(0 && "pointer is expr::read");
 					}
 					std::vector<ref<klee::Expr> >::iterator first = (*currentEvent)->instParameter.begin();
-					for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end();
-							it != ie; ++it) {
+					for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie; ++it) {
 						ref<Expr> index = executor->eval(ki, it->first, state).value;
 						if (index->getKind() != Expr::Constant) {
 							executor->ineval(ki, it->first, state, *first);
@@ -356,7 +354,7 @@ namespace klee {
 
 //TODO： Algorithm 2 AnalyseTaint
 	void TaintListener::afterExecuteInstruction(ExecutionState &state, KInstruction *ki) {
-		Trace* trace = runtimeData->getCurrentTrace();
+		Trace* trace = rdManager->getCurrentTrace();
 		if ((*currentEvent)) {
 			Instruction* inst = ki->inst;
 			Thread* thread = state.currentThread;
@@ -391,8 +389,7 @@ namespace klee {
 						//会丢失指针的一些关系约束，但是不影响。
 						if (id == Type::PointerTyID && PTR) {
 							ref<Expr> address = executor->eval(ki, 0, state).value;
-							for (std::map<ref<Expr>, ref<Expr> >::iterator it = addressSymbolicMap.begin(), ie = addressSymbolicMap.end();
-									it != ie; ++it) {
+							for (std::map<ref<Expr>, ref<Expr> >::iterator it = addressSymbolicMap.begin(), ie = addressSymbolicMap.end(); it != ie; ++it) {
 								if (it->first == address) {
 									executor->getDestCell(state, ki).value = it->second;
 									break;
@@ -405,7 +402,7 @@ namespace klee {
 					ref<Expr> address = executor->eval(ki, 0, state).value;
 					ref<Expr> value = executor->getDestCell(state, ki).value;
 					ObjectPair op;
-					executor->getMemoryObject(op, state, address);
+					executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 					const ObjectState *os = op.second;
 					bool isTaint = false;
 					if (os->isTaint.find(address) != os->isTaint.end()) {
@@ -454,7 +451,7 @@ namespace klee {
 					if (f->getName() == "make_taint") {
 						ref<Expr> address = executor->eval(ki, 1, state).value;
 						ObjectPair op;
-						executor->getMemoryObject(op, state, address);
+						executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 						const MemoryObject *mo = op.first;
 						const ObjectState* os = op.second;
 						ObjectState *wos = state.currentStack->addressSpace->getWriteable(mo, os);
@@ -466,7 +463,7 @@ namespace klee {
 
 						ref<Expr> pthreadAddress = executor->eval(ki, 1, state).value;
 						ObjectPair pthreadop;
-						executor->getMemoryObject(pthreadop, state, pthreadAddress);
+						executor->getMemoryObject(pthreadop, state, state.currentStack->addressSpace, pthreadAddress);
 						const ObjectState* pthreados = pthreadop.second;
 						const MemoryObject* pthreadmo = pthreadop.first;
 						Expr::Width size = BIT_WIDTH;
@@ -514,7 +511,7 @@ namespace klee {
 
 //消息相应函数，在前缀执行出错之后程序推出之前调用
 	void TaintListener::executionFailed(ExecutionState &state, KInstruction *ki) {
-		runtimeData->getCurrentTrace()->traceType = Trace::FAILED;
+		rdManager->getCurrentTrace()->traceType = Trace::FAILED;
 	}
 
 	ref<Expr> TaintListener::manualMakeTaintSymbolic(ExecutionState& state, std::string name, unsigned size) {
@@ -542,7 +539,7 @@ namespace klee {
 
 	ref<Expr> TaintListener::readExpr(ExecutionState &state, ref<Expr> address, Expr::Width size) {
 		ObjectPair op;
-		executor->getMemoryObject(op, state, address);
+		executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 		const MemoryObject *mo = op.first;
 		ref<Expr> offset = mo->getOffsetExpr(address);
 		const ObjectState *os = op.second;
