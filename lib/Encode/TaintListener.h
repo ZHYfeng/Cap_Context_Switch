@@ -42,7 +42,7 @@ namespace klee {
 
 		private:
 			Executor* executor;
-			std::vector<Event*>::iterator currentEvent;
+			Event* currentEvent;
 			FilterSymbolicExpr filter;
 
 			//此Map更新有两处，Load、某些函数。

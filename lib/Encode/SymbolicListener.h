@@ -43,12 +43,8 @@ namespace klee {
 
 		private:
 			Executor* executor;
-			std::vector<Event*>::iterator currentEvent;
+			Event* currentEvent;
 			FilterSymbolicExpr filter;
-
-			//此Map更新有两处，Load、某些函数。
-			std::map<ref<Expr>, ref<Expr> > addressSymbolicMap;
-			std::map<std::string, ref<Expr> > symbolicMap;
 
 			std::map<std::string, std::vector<unsigned> > assertMap;
 			bool kleeBr;

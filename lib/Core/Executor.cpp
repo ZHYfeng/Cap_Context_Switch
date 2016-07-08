@@ -895,6 +895,23 @@ const Cell& Executor::eval(KInstruction *ki, unsigned index, ExecutionState &sta
 	}
 }
 
+const Cell& Executor::evalCurrent(KInstruction *ki, unsigned index, ExecutionState &state) const {
+	assert(index < ki->inst->getNumOperands());
+	int vnumber = ki->operands[index];
+
+	assert(vnumber != -1 && "Invalid operand to eval(), not a value or constant!");
+
+	// Determine if this is a constant or not.
+	if (vnumber < 0) {
+		unsigned index = -vnumber - 2;
+		return kmodule->constantTable[index];
+	} else {
+		unsigned index = vnumber;
+		StackFrame &sf = state.currentThread->stack->realStack.back();
+		return sf.locals[index];
+	}
+}
+
 void Executor::ineval(KInstruction *ki, unsigned index, ExecutionState &state, ref<Expr> value) const {
 	assert(index < ki->inst->getNumOperands());
 	int vnumber = ki->operands[index];

@@ -45,7 +45,7 @@ using namespace llvm;
 namespace klee {
 
 	TaintListener::TaintListener(Executor* executor, RuntimeDataManager* rdManager) :
-			BitcodeListener(rdManager), executor(executor) {
+			BitcodeListener(rdManager), executor(executor), currentEvent(NULL) {
 		kind = TaintListenerKind;
 	}
 
@@ -57,17 +57,17 @@ namespace klee {
 //消息响应函数，在被测程序解释执行之前调用
 	void TaintListener::beforeRunMethodAsMain(ExecutionState &initialState) {
 
-		Trace* trace = rdManager->getCurrentTrace();
-		currentEvent = trace->path.begin();
 	}
 
 	void TaintListener::beforeExecuteInstruction(ExecutionState &state, KInstruction *ki) {
 		Trace* trace = rdManager->getCurrentTrace();
+		currentEvent = trace->path.back();
+
 		Instruction* inst = ki->inst;
 //		Thread* thread = state.currentThread;
 //	std::cerr << "thread id : " << thread->threadId << " ";
 //	inst->dump();
-		if ((*currentEvent)) {
+		if (currentEvent) {
 			switch (inst->getOpcode()) {
 				case Instruction::Br: {
 					BranchInst *bi = dyn_cast<BranchInst>(inst);
@@ -76,7 +76,7 @@ namespace klee {
 						if (value1->getKind() != Expr::Constant) {
 							Expr::Width width = value1->getWidth();
 							ref<Expr> value2;
-							if ((*currentEvent)->brCondition == true) {
+							if (currentEvent->brCondition == true) {
 								value2 = ConstantExpr::create(true, width);
 							} else {
 								value2 = ConstantExpr::create(false, width);
@@ -90,14 +90,14 @@ namespace klee {
 //			SwitchInst *si = cast<SwitchInst>(inst);
 					ref<Expr> cond1 = executor->eval(ki, 0, state).value;
 					if (cond1->getKind() != Expr::Constant) {
-						ref<Expr> cond2 = (*currentEvent)->instParameter.back();
+						ref<Expr> cond2 = currentEvent->instParameter.back();
 						executor->ineval(ki, 0, state, cond2);
 					}
 					break;
 				}
 				case Instruction::Call: {
 					CallSite cs(inst);
-					Function *f = (*currentEvent)->calledFunction;
+					Function *f = currentEvent->calledFunction;
 					ref<Expr> function = executor->eval(ki, 0, state).value;
 					if (function->getKind() == Expr::Concat) {
 						ref<Expr> value = symbolicMap[filter.getGlobalName(function)];
@@ -109,7 +109,7 @@ namespace klee {
 						}
 						executor->ineval(ki, 0, state, value);
 					}
-					if (!(*currentEvent)->isFunctionWithSourceCode) {
+					if (!currentEvent->isFunctionWithSourceCode) {
 						unsigned numArgs = cs.arg_size();
 						for (unsigned j = numArgs; j > 0; j--) {
 							ref<Expr> value = executor->eval(ki, j, state).value;
@@ -133,7 +133,7 @@ namespace klee {
 									}
 									executor->ineval(ki, j, state, svalue);
 								} else {
-									ref<Expr> svalue = (*currentEvent)->instParameter[j - 1];
+									ref<Expr> svalue = currentEvent->instParameter[j - 1];
 									if (svalue->getKind() != Expr::Constant) {
 										assert(0 && "store value is symbolic");
 									} else if (id == Type::PointerTyID) {
@@ -189,8 +189,8 @@ namespace klee {
 					ref<Expr> value = executor->eval(ki, 0, state).value;
 //			cerr << "value : " << value << "\n";
 					bool isTaint = value->isTaint;
-					std::vector<ref<klee::Expr> >* relatedSymbolicExpr = &((*currentEvent)->relatedSymbolicExpr);
-					filter.resolveTaintExpr(value, (*currentEvent)->relatedSymbolicExpr, isTaint);
+					std::vector<ref<klee::Expr> >* relatedSymbolicExpr = &(currentEvent->relatedSymbolicExpr);
+					filter.resolveTaintExpr(value, currentEvent->relatedSymbolicExpr, isTaint);
 //			cerr << "relatedSymbolicExpr" << "\n";
 //			for (std::vector<ref<klee::Expr> >::iterator it = relatedSymbolicExpr->begin();
 //					it != relatedSymbolicExpr->end(); it++) {
@@ -211,7 +211,7 @@ namespace klee {
 					if ((id >= Type::HalfTyID) && (id <= Type::DoubleTyID)) {
 						isFloat = 1;
 					}
-					if ((*currentEvent)->isGlobal) {
+					if (currentEvent->isGlobal) {
 #if PTR
 						if (isFloat || id == Type::IntegerTyID
 								|| id == Type::PointerTyID) {
@@ -219,12 +219,12 @@ namespace klee {
 						if (isFloat || id == Type::IntegerTyID) {
 #endif
 							Expr::Width size = executor->getWidthForLLVMType(ki->inst->getOperand(0)->getType());
-							ref<Expr> symbolic = manualMakeTaintSymbolic(state, (*currentEvent)->globalName, size);
+							ref<Expr> symbolic = manualMakeTaintSymbolic(state, currentEvent->globalName, size);
 
 							//收集TS和PTS
-							std::string varName = (*currentEvent)->name;
+							std::string varName = currentEvent->name;
 							if (isTaint) {
-								trace->DTAMSerial.insert((*currentEvent)->globalName);
+								trace->DTAMSerial.insert(currentEvent->globalName);
 								manualMakeTaint(symbolic, true);
 								trace->taintSymbolicExpr.insert(varName);
 								if (trace->unTaintSymbolicExpr.find(varName) != trace->unTaintSymbolicExpr.end()) {
@@ -261,7 +261,7 @@ namespace klee {
 								}
 								executor->ineval(ki, 0, state, svalue);
 							} else {
-								ref<Expr> svalue = (*currentEvent)->instParameter.back();
+								ref<Expr> svalue = currentEvent->instParameter.back();
 								if (svalue->getKind() != Expr::Constant) {
 									assert(0 && "store value is symbolic");
 								} else if (id == Type::PointerTyID) {
@@ -317,7 +317,7 @@ namespace klee {
 					} else if (base->getKind() == Expr::Read) {
 						assert(0 && "pointer is expr::read");
 					}
-					std::vector<ref<klee::Expr> >::iterator first = (*currentEvent)->instParameter.begin();
+					std::vector<ref<klee::Expr> >::iterator first = currentEvent->instParameter.begin();
 					for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie; ++it) {
 						ref<Expr> index = executor->eval(ki, it->first, state).value;
 						if (index->getKind() != Expr::Constant) {
@@ -357,7 +357,7 @@ namespace klee {
 //TODO： Algorithm 2 AnalyseTaint
 	void TaintListener::afterExecuteInstruction(ExecutionState &state, KInstruction *ki) {
 		Trace* trace = rdManager->getCurrentTrace();
-		if ((*currentEvent)) {
+		if (currentEvent) {
 			Instruction* inst = ki->inst;
 			Thread* thread = state.currentThread;
 			switch (inst->getOpcode()) {
@@ -367,11 +367,11 @@ namespace klee {
 					if ((id >= Type::HalfTyID) && (id <= Type::DoubleTyID)) {
 						isFloat = 1;
 					}
-					if ((*currentEvent)->isGlobal) {
+					if (currentEvent->isGlobal) {
 
 						for (unsigned i = 0; i < thread->vectorClock.size(); i++) {
-							(*currentEvent)->vectorClock.push_back(thread->vectorClock[i]);
-//					cerr << "vectorClock " << i << " : " << (*currentEvent)->vectorClock[i] << "\n";
+							currentEvent->vectorClock.push_back(thread->vectorClock[i]);
+//					cerr << "vectorClock " << i << " : " << currentEvent->vectorClock[i] << "\n";
 						}
 
 						//指针！！！
@@ -382,10 +382,10 @@ namespace klee {
 #endif
 							Expr::Width size = executor->getWidthForLLVMType(ki->inst->getType());
 							ref<Expr> value = executor->getDestCell(state, ki).value;
-							ref<Expr> symbolic = manualMakeTaintSymbolic(state, (*currentEvent)->globalName, size);
+							ref<Expr> symbolic = manualMakeTaintSymbolic(state, currentEvent->globalName, size);
 							executor->getDestCell(state, ki).value = symbolic;
-							symbolicMap[(*currentEvent)->globalName] = value;
-//					std::cerr << "globalVarFullName : " << (*currentEvent)->globalVarFullName << "\n";
+							symbolicMap[currentEvent->globalName] = value;
+//					std::cerr << "globalVarFullName : " << currentEvent->globalVarFullName << "\n";
 						}
 					} else {
 						//会丢失指针的一些关系约束，但是不影响。
@@ -412,8 +412,8 @@ namespace klee {
 					}
 					if (isTaint) {
 						manualMakeTaint(value, true);
-						if (!inst->getType()->isPointerTy() && (*currentEvent)->isGlobal) {
-							trace->DTAMSerial.insert((*currentEvent)->globalName);
+						if (!inst->getType()->isPointerTy() && currentEvent->isGlobal) {
+							trace->DTAMSerial.insert(currentEvent->globalName);
 
 //					inst->dump();
 						}
@@ -426,18 +426,18 @@ namespace klee {
 					break;
 				}
 				case Instruction::Store: {
-					if ((*currentEvent)->isGlobal) {
+					if (currentEvent->isGlobal) {
 						for (unsigned i = 0; i < thread->vectorClock.size(); i++) {
-							(*currentEvent)->vectorClock.push_back(thread->vectorClock[i]);
-//					cerr << "vectorClock " << i << " : " << (*currentEvent)->vectorClock[i] << "\n";
+							currentEvent->vectorClock.push_back(thread->vectorClock[i]);
+//					cerr << "vectorClock " << i << " : " << currentEvent->vectorClock[i] << "\n";
 						}
 					}
 					break;
 				}
 				case Instruction::Call: {
 					CallSite cs(inst);
-					Function *f = (*currentEvent)->calledFunction;
-					if (!(*currentEvent)->isFunctionWithSourceCode) {
+					Function *f = currentEvent->calledFunction;
+					if (!currentEvent->isFunctionWithSourceCode) {
 						unsigned numArgs = cs.arg_size();
 						bool isTaint = 0;
 						for (unsigned j = numArgs; j > 0; j--) {
@@ -459,7 +459,7 @@ namespace klee {
 						ObjectState *wos = state.currentStack->addressSpace->getWriteable(mo, os);
 						wos->insertTaint(address);
 
-						trace->initTaintSymbolicExpr.insert((*currentEvent)->globalName);
+						trace->initTaintSymbolicExpr.insert(currentEvent->globalName);
 
 					} else if (f->getName() == "pthread_create") {
 
@@ -471,7 +471,7 @@ namespace klee {
 						Expr::Width size = BIT_WIDTH;
 						ref<Expr> value = pthreados->read(0, size);
 						if (executor->isGlobalMO(pthreadmo)) {
-							string globalVarFullName = (*currentEvent)->globalName;
+							string globalVarFullName = currentEvent->globalName;
 							symbolicMap[globalVarFullName] = value;
 						}
 
@@ -525,7 +525,7 @@ namespace klee {
 		ref<Expr> offset = ConstantExpr::create(0, BIT_WIDTH);
 		ref<Expr> result = os->read(offset, size);
 #if DEBUGSYMBOLIC
-		cerr << "Event name : " << (*currentEvent)->eventName << "\n";
+		cerr << "Event name : " << currentEvent->eventName << "\n";
 		cerr << "make symboic:" << name << std::endl;
 		cerr << "isTaint:" << isTaint << std::endl;
 		std::cerr << "result : ";

@@ -304,6 +304,8 @@ namespace klee {
 
 			const Cell& eval(KInstruction *ki, unsigned index, ExecutionState &state) const;
 
+			const Cell& evalCurrent(KInstruction *ki, unsigned index, ExecutionState &state) const;
+
 			void ineval(KInstruction *ki, unsigned index, ExecutionState &state, ref<Expr> value) const;
 
 			Cell& getArgumentCell(ExecutionState &state, KFunction *kf, unsigned index) {
@@ -312,6 +314,10 @@ namespace klee {
 
 			Cell& getDestCell(ExecutionState &state, KInstruction *target) {
 				return state.currentStack->realStack.back().locals[target->dest];
+			}
+
+			Cell& getCurrentDestCell(ExecutionState &state, KInstruction *target) {
+				return state.currentThread->stack->realStack.back().locals[target->dest];
 			}
 
 			void bindLocal(KInstruction *target, ExecutionState &state, ref<Expr> value);
