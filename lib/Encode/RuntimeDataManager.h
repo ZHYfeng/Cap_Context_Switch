@@ -42,8 +42,6 @@ class RuntimeDataManager {
 		double satCost;
 		double unSatCost;
 
-		unsigned runState;
-
 		double TaintCost;
 		double PTSCost;
 		double DTAMCost;

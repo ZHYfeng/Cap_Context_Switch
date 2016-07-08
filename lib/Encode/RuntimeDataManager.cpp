@@ -33,7 +33,6 @@ RuntimeDataManager::RuntimeDataManager() :
 	runningCost = 0.0;
 	satCost = 0.0;
 	unSatCost = 0.0;
-	runState = 0;
 
 	TaintCost = 0;
 	PTSCost = 0;

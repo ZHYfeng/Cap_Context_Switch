@@ -62,7 +62,6 @@ namespace klee {
 			std::map<uint64_t, BarrierInfo*> barrierRecord;
 
 		private:
-			//std::vector<string> monitoredFunction;
 			void handleInitializer(llvm::Constant* initializer, MemoryObject* mo, uint64_t& startAddress);
 			void handleConstantExpr(llvm::ConstantExpr* expr);
 			void insertGlobalVariable(ref<Expr> address, llvm::Type* type);

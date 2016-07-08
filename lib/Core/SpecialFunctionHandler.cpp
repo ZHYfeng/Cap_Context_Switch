@@ -115,8 +115,6 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   // operator new(unsigned int)
   add("_Znwj", handleNew, true),
 
-  // FIXME-64: This is wrong for 64-bit long...
-
   // operator new[](unsigned long)
   add("_Znam", handleNewArray, true),
   // operator new(unsigned long)

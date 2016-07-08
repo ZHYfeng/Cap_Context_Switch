@@ -97,7 +97,6 @@ namespace klee {
 
 // filter the instruction linked by klee force-import such as klee_div_zero_check
 		if (kmodule->internalFunctions.find(inst->getParent()->getParent()) == kmodule->internalFunctions.end()) {
-			//cerr << " dir: " << dir << " file: " << file << " line: " << line << endl;
 			item = trace->createEvent(thread->threadId, ki, Event::NORMAL);
 		} else {
 			item = trace->createEvent(thread->threadId, ki, Event::IGNORE);
@@ -133,6 +132,7 @@ namespace klee {
 						item->instParameter.push_back(executor->eval(ki, j + 1, state).value);
 					}
 				}
+
 //		std::cerr<<"call name : "<< f->getName().str().c_str() <<"\n";
 				if (f->getName().str() == "pthread_create") {
 					ref<Expr> pthreadAddress = executor->eval(ki, 1, state).value;
@@ -166,32 +166,29 @@ namespace klee {
 				} else if (f->getName().str() == "pthread_cond_wait") {
 					ref<Expr> param;
 					ObjectPair op;
-					Event *lock;
-//			Event *unlock;
+					Event *lock, *unlock;
 					bool success;
-					//get lock
 					param = executor->eval(ki, 2, state).value;
 					success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, param);
 					if (success) {
 						const MemoryObject* mo = op.first;
 						string mutexName = createVarName(mo->id, param, executor->isGlobalMO(mo));
-//				unlock = trace->createEvent(thread->threadId, ki,
-//						Event::VIRTUAL);
-//				unlock->calledFunction = f;
-//				string temp = item->eventName;
-//				item->eventName = unlock->eventName;
-//				unlock->eventName = temp;
-//				unlock->eventName = item->eventName;
-//				frontVirtualEvents.push_back(unlock);
+						unlock = trace->createEvent(thread->threadId, ki, Event::VIRTUAL);
+						unlock->calledFunction = f;
+						string temp = item->eventName;
+						item->eventName = unlock->eventName;
+						unlock->eventName = temp;
+						unlock->eventName = item->eventName;
+						frontVirtualEvents.push_back(unlock);
 						lock = trace->createEvent(thread->threadId, ki, Event::VIRTUAL);
 						lock->calledFunction = f;
+						frontVirtualEvents.push_back(unlock);
 						backVirtualEvents.push_back(lock);
-						trace->insertLockOrUnlock(thread->threadId, mutexName, item, false);
+						trace->insertLockOrUnlock(thread->threadId, mutexName, unlock, false);
 						trace->insertLockOrUnlock(thread->threadId, mutexName, lock, true);
 					} else {
 						assert(0 && "mutex not exist");
 					}
-					//get cond
 					param = executor->eval(ki, 1, state).value;
 					success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, param);
 					if (success) {
@@ -295,42 +292,6 @@ namespace klee {
 					param = executor->eval(ki, 3, state).value;
 					ConstantExpr* countExpr = dyn_cast<ConstantExpr>(param);
 					barrierInfo->count = countExpr->getZExtValue();
-					//				} else if (f->getName().str() == "printf") {
-					//					//find variable used in printf and insert its value into rdManaget
-					//					// have serious bug! need to repair!
-					//					//ylc
-					//					CallInst* calli = dyn_cast<CallInst>(inst);
-					//					unsigned argNum = calli->getNumArgOperands();
-					//					//printf is external, having no element in stack, so the top of stack is the caller
-					//					KFunction* kf = state.stack.back().kf;
-					//					//skip the first param : format
-					//					for (unsigned i = 1; i < argNum; i++) {
-					//						ref<Expr> param = executor->eval(ki, i + 1, state).value;
-					//						Type* paramType = calli->getArgOperand(i)->getType();
-					//						Constant* constant = expr2Constant(param.get(),
-					//								paramType);
-					//						int index = ki->operands[i + 1]
-					//								- kf->function->arg_size();
-					//						KInstruction* paramLoad = kf->instructions[index];
-					//						string name;
-					//						if (paramLoad->inst->getOpcode() == Instruction::Load) {
-					//							ref<Expr> address = executor->eval(paramLoad, 0,
-					//									state).value;
-					//							ObjectPair op;
-					//							bool success = executor->getMemoryObject(op, state, address);
-					//							if (success) {
-					//								const MemoryObject *mo = op.first;
-					//								name = createVarName(mo->id, address,
-					//										executor->isGlobalMO(mo));
-					//							} else {
-					//								assert(0 && "resolve param address failed");
-					//							}
-					//						} else {
-					//							name = createTemporalName();
-					//						}
-					//						item->outputParams.push_back(constant);
-					//						rdManager.insertPrintfParam(name, constant);
-					//					}
 				} else if (f->getName() == "make_taint") {
 					ref<Expr> address = executor->eval(ki, 1, state).value;
 					ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address.get());
@@ -343,9 +304,6 @@ namespace klee {
 							if (executor->isGlobalMO(mo)) {
 								item->isGlobal = true;
 							}
-							//					if (mo->isGlobal) {
-							//						insertGlobalVariable(address, inst->getOperand(1)->getType()->getPointerElementType());
-							//					}
 							string varName = createVarName(mo->id, address, item->isGlobal);
 							string varFullName;
 							if (item->isGlobal) {
@@ -355,7 +313,6 @@ namespace klee {
 								} else {
 									varFullName = createGlobalVarFullName(varName, storeTime, true);
 								}
-
 							}
 							item->globalName = varFullName;
 							item->name = varName;
@@ -369,19 +326,6 @@ namespace klee {
 			}
 
 			case Instruction::Ret: {
-				//runtime.popStackFrame(state.threadId);
-				break;
-			}
-
-			case Instruction::Add: {
-				break;
-			}
-
-			case Instruction::Sub: {
-				break;
-			}
-
-			case Instruction::Mul: {
 				break;
 			}
 
@@ -401,81 +345,8 @@ namespace klee {
 				}
 				item->isConditionInst = true;
 				item->brCondition = true;
-				Type* pointedTy = gp->getPointerOperand()->getType()->getPointerElementType();
-				switch (pointedTy->getTypeID()) {
-					case Type::ArrayTyID: {
-						//只处理索引值是变量的getElementPtr属性，因为索引值是常量时其访问的元素不会随线程交织变化
-						if (inst->getOperand(2)->getValueID() != Value::ConstantIntVal) {
-//				uint64_t num = pointedTy->getArrayNumElements();
-//				uint64_t elementBitWidth =
-//						executor->kmodule->targetData->getTypeSizeInBits(
-//								pointedTy->getArrayElementType());
-//				Expr* expr = executor->eval(ki, 0, state).value.get();
-//				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(expr);
-//				uint64_t base = cexpr->getZExtValue();
-//				expr = executor->eval(ki, 2, state).value.get();
-//				cexpr = dyn_cast<ConstantExpr>(expr);
-//				uint64_t selectedIndex = cexpr->getZExtValue();
-						}
-						break;
-					}
-
-					case Type::HalfTyID:
-					case Type::FloatTyID:
-					case Type::DoubleTyID:
-					case Type::X86_FP80TyID:
-					case Type::FP128TyID:
-					case Type::PPC_FP128TyID:
-					case Type::IntegerTyID: {
-						if (inst->getOperand(1)->getValueID() != Value::ConstantIntVal) {
-							Type* pointedTy = inst->getOperand(0)->getType()->getPointerElementType();
-							uint64_t elementBitWidth = executor->kmodule->targetData->getTypeSizeInBits(pointedTy);
-							Expr* expr = executor->eval(ki, 0, state).value.get();
-							ConstantExpr* cexpr = dyn_cast<ConstantExpr>(expr);
-							uint64_t base = cexpr->getZExtValue();
-							expr = executor->eval(ki, 1, state).value.get();
-							cexpr = dyn_cast<ConstantExpr>(expr);
-							uint64_t index = cexpr->getZExtValue();
-							uint64_t startAddress = base + index * elementBitWidth / 8;
-							ObjectPair op;
-//				cerr << "base = " << base << " index = " << index << " startAddress = " << startAddress << " pointerWidth = " << Context::get().getPointerWidth() << endl;
-							bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, ConstantExpr::create(startAddress, Context::get().getPointerWidth()));
-							if (success) {
-								const MemoryObject* mo = op.first;
-								uint64_t elementNum = mo->size / (elementBitWidth / 8);
-								if (elementNum > 1) {
-//						uint64_t selectedIndex = (startAddress - mo->address)
-//								/ (elementBitWidth / 8);
-								}
-							} else {
-								inst->dump();
-								cerr << "access address: " << startAddress << "has not been allocated" << endl;
-								//assert(0 && "the address has not been allocated");
-							}
-						}
-						break;
-					}
-
-					default: {
-						//cerr << "unhandled type " << pointedTy->getTypeID() << endl;
-					}
-
-				}
 				break;
 			}
-
-			case Instruction::ICmp: {
-				break;
-			}
-
-			case Instruction::BitCast: {
-				break;
-			}
-
-			case Instruction::PHI: {
-				break;
-			}
-
 			case Instruction::Br: {
 				BranchInst *bi = dyn_cast<BranchInst>(inst);
 				if (!bi->isUnconditional()) {
@@ -499,10 +370,6 @@ namespace klee {
 					ref<Expr> address = executor->eval(ki, 0, state).value;
 					ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address.get());
 					if (realAddress) {
-//				Expr::Width size = executor->getWidthForLLVMType(
-//						ki->inst->getType());
-//				ref<Expr> value = readExpr(state, address, size);
-//				cerr << "load value : " << value << "\n";
 						uint64_t key = realAddress->getZExtValue();
 						ObjectPair op;
 						bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
@@ -510,13 +377,7 @@ namespace klee {
 							const MemoryObject *mo = op.first;
 							if (executor->isGlobalMO(mo)) {
 								item->isGlobal = true;
-//						if(mo->isArg){
-//							item->isArg = 1;
-//						}
 							}
-							//					if (mo->isGlobal) {
-							//						insertGlobalVariable(address, inst->getOperand(0)->getType()->getPointerElementType());
-							//					}
 							string varName = createVarName(mo->id, address, item->isGlobal);
 							string varFullName;
 							if (item->isGlobal) {
@@ -536,14 +397,6 @@ namespace klee {
 							if (inst->getOperand(0)->getValueID() == Value::InstructionVal + Instruction::GetElementPtr) {
 
 							}
-							//					if (item->vectorInfo) {
-							//						vector<uint64_t> v = item->vectorInfo->getAllPossibleAddress();
-							//						for(vector<uint64_t>::iterator vi = v.begin(), ve = v.end(); vi != ve; vi++) {
-							//							cerr << *vi << " ";
-							//						}
-							//						cerr << endl;
-							//					}
-							//					cerr << "address = " << realAddress->getZExtValue() << endl;
 						} else {
 							cerr << "Load address = " << realAddress->getZExtValue() << endl;
 							assert(0 && "load resolve unsuccess");
@@ -569,9 +422,6 @@ namespace klee {
 						if (executor->isGlobalMO(mo)) {
 							item->isGlobal = true;
 						}
-						//					if (mo->isGlobal) {
-						//						insertGlobalVariable(address, inst->getOperand(1)->getType()->getPointerElementType());
-						//					}
 						string varName = createVarName(mo->id, address, item->isGlobal);
 						string varFullName;
 						if (item->isGlobal) {
@@ -587,15 +437,6 @@ namespace klee {
 #endif
 							trace->insertWriteSet(varName, item);
 						}
-						//					if (item->vectorInfo) {
-						//						vector<uint64_t> v = item->vectorInfo->getAllPossibleAddress();
-						//						for(vector<uint64_t>::iterator vi = v.begin(), ve = v.end(); vi != ve; vi++) {
-						//							cerr << *vi << " ";
-						//						}
-						//						cerr << endl;
-						//					}
-						//					cerr << "address = " << realAddress->getZExtValue() << endl;
-					} else {
 						cerr << "Store address = " << realAddress->getZExtValue() << endl;
 						assert(0 && "store resolve unsuccess");
 					}
@@ -605,7 +446,6 @@ namespace klee {
 				break;
 			}
 			case Instruction::Switch: {
-//		SwitchInst *si = cast<SwitchInst>(inst);
 				ref<Expr> cond = executor->eval(ki, 0, state).value;
 				item->instParameter.push_back(cond);
 				item->isConditionInst = true;
@@ -614,13 +454,10 @@ namespace klee {
 			}
 
 			default: {
-				//			cerr << inst->getOpcodeName();
-				//			assert(0 && "unsupport");
 				break;
 			}
 
 		}
-		//runtime.printRunTime();
 		for (vector<Event*>::iterator ei = frontVirtualEvents.begin(), ee = frontVirtualEvents.end(); ei != ee; ei++) {
 			trace->insertEvent(*ei, thread->threadId);
 		}
@@ -633,71 +470,8 @@ namespace klee {
 	}
 
 //指令调用消息响应函数，在指令解释执行之后调用
-
 	void PSOListener::afterExecuteInstruction(ExecutionState &state, KInstruction *ki) {
-		if (lastEvent) {
-			Instruction* inst = ki->inst;
-			Thread* thread = state.currentThread;
-			switch (inst->getOpcode()) {
 
-				case Instruction::Switch: {
-					BasicBlock* bb = thread->pc->inst->getParent();
-					SwitchInst* si = dyn_cast<SwitchInst>(ki->inst);
-					unsigned bbIndex = 0;
-					bool isDefault = true;
-					for (SwitchInst::CaseIt sci = si->case_begin(), sce = si->case_end(); sci != sce; sci++) {
-						bbIndex++;
-						if (sci.getCaseSuccessor() == bb) {
-							isDefault = false;
-							break;
-						}
-					}
-					//对于switch语句的default块，index标记为-1
-					if (isDefault) {
-						bbIndex = 0;
-					}
-					break;
-				}
-
-				case Instruction::Ret: {
-//			if (executor->isAllThreadTerminate()) {
-//				for (map<uint64_t, Type*>::iterator mi =
-//						usedGlobalVariableRecord.begin(), me =
-//						usedGlobalVariableRecord.end(); mi != me; mi++) {
-//					ObjectPair op;
-//					//					cerr << mi->second->getTypeID() << endl;
-//					ref<ConstantExpr> address = ConstantExpr::alloc(mi->first,
-//							Context::get().getPointerWidth());
-//					executor->getMemoryObject(op, state, address);
-//					ref<Expr> value = getExprFromMemory(address, op,
-//							mi->second);
-//					rdManager.insertGlobalVariableLast(
-//							createVarName(op.first->id, address, true),
-//							expr2Constant(value.get(), mi->second));
-//				}
-//			}
-					break;
-				}
-
-				case Instruction::Call: {
-
-					break;
-				}
-
-				case Instruction::Load: {
-					break;
-				}
-
-				case Instruction::Store: {
-					break;
-				}
-
-				case Instruction::GetElementPtr: {
-					break;
-				}
-
-			}
-		}
 	}
 
 //消息响应函数，在被测程序解释执行之后调用
@@ -719,7 +493,7 @@ namespace klee {
 			cerr << "######################本条路径为旧路径####################\n";
 			executor->getNewPrefix();
 		} else {
-			rdManager->runState = 1;
+
 			std::map<std::string, std::vector<Event *> > &writeSet = trace->writeSet;
 			std::map<std::string, std::vector<Event *> > &readSet = trace->readSet;
 			for (std::map<std::string, std::vector<Event *> >::iterator nit = readSet.begin(), nie = readSet.end(); nit != nie; ++nit) {
@@ -733,7 +507,6 @@ namespace klee {
 			}
 			rdManager->allGlobal += allGlobal;
 		}
-
 	}
 
 //消息相应函数，在前缀执行出错之后程序推出之前调用
@@ -908,17 +681,6 @@ namespace klee {
 		if (!f->getName().startswith("klee") && !executor->kmodule->functionMap[f] && !returnType->isVoidTy()) {
 			ref<Expr> returnValue = executor->getDestCell(state, ki).value;
 			result = Transfer::expr2Constant(returnValue.get(), returnType);
-//		if (dyn_cast<ConstantInt>(result)) {
-//			ConstantInt* ci = dyn_cast<ConstantInt>(result);
-//			cerr << ci->getType()->getBitWidth() << " " << ci->getZExtValue() << endl;
-//		} else if (dyn_cast<ConstantFP>(result)) {
-//			ConstantFP* cfp = dyn_cast<ConstantFP>(result);
-//			if (cfp->getType()->isFloatTy()) {
-//				cerr << "float: " << cfp->getValueAPF().convertToFloat() << endl;
-//			} else if (cfp->getType()->isDoubleTy()) {
-//				cerr << "double: " << cfp->getValueAPF().convertToDouble() << endl;
-//			}
-//		}
 		}
 		return result;
 	}

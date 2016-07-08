@@ -45,7 +45,6 @@ namespace klee {
 			std::vector<Event*>::iterator currentEvent;
 			FilterSymbolicExpr filter;
 
-
 			//此Map更新有两处，Load、某些函数。
 			std::map<ref<Expr>, ref<Expr> > addressSymbolicMap;
 			std::map<std::string, ref<Expr> > symbolicMap;
