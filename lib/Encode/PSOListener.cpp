@@ -333,7 +333,6 @@ namespace klee {
 				//对于对数组解引用的GetElementPtr，获取其所有元素的地址，存放在Event中
 				//目前只处理一维数组,多维数组及指针数组赞不考虑，该处理函数存在问题
 				//ylc
-				GetElementPtrInst* gp = dyn_cast<GetElementPtrInst>(inst);
 				KGEPInstruction *kgepi = static_cast<KGEPInstruction*>(ki);
 				for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie; ++it) {
 					ref<Expr> index = executor->eval(ki, it->first, state).value;

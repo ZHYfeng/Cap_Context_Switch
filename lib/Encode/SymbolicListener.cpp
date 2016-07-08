@@ -102,7 +102,7 @@ namespace klee {
 				case Instruction::Store: {
 					ref<Expr> address = executor->eval(ki, 1, state).value;
 					if (address->getKind() == Expr::Concat) {
-						ref<Expr> value = executor->evalCurrent(ki, 0, state).value;
+						ref<Expr> value = executor->evalCurrent(ki, 1, state).value;
 						executor->ineval(ki, 1, state, value);
 					}
 
@@ -170,13 +170,19 @@ namespace klee {
 					}
 					break;
 				}
-				case Instruction::Select: {
-
+				case Instruction::Switch: {
+					ref<Expr> cond1 = executor->eval(ki, 0, state).value;
+					if (cond1->getKind() != Expr::Constant) {
+						ref<Expr> cond2 = executor->evalCurrent(ki, 0, state).value;
+						ref<Expr> constraint = EqExpr::create(cond1, cond2);
+						trace->brSymbolicExpr.push_back(constraint);
+						trace->brEvent.push_back(currentEvent);
+						executor->ineval(ki, 0, state, cond2);
+					}
 					break;
 				}
 				case Instruction::Call: {
 					CallSite cs(inst);
-					Function *f = currentEvent->calledFunction;
 					ref<Expr> function = executor->eval(ki, 0, state).value;
 					if (function->getKind() != Expr::Constant) {
 						ref<Expr> value = executor->evalCurrent(ki, 0, state).value;
@@ -201,7 +207,7 @@ namespace klee {
 							}
 							if (isFloat || id == Type::IntegerTyID || id == Type::PointerTyID) {
 								if (value->getKind() != Expr::Constant) {
-									ref<Expr> svalue = executor->evalCurrent(ki, 0, state).value;
+									ref<Expr> svalue = executor->evalCurrent(ki, j, state).value;
 									executor->ineval(ki, j, state, svalue);
 								}
 							} else {
@@ -239,17 +245,6 @@ namespace klee {
 //						std::cerr << "kgepi->offset : " << kgepi->offset << std::endl;
 						//目前没有这种情况...
 //						assert(0 && "kgepi->offset");
-					}
-					break;
-				}
-				case Instruction::Switch: {
-					ref<Expr> cond1 = executor->eval(ki, 0, state).value;
-					if (cond1->getKind() != Expr::Constant) {
-						ref<Expr> cond2 = executor->evalCurrent(ki, 0, state).value;
-						ref<Expr> constraint = EqExpr::create(cond1, cond2);
-						trace->brSymbolicExpr.push_back(constraint);
-						trace->brEvent.push_back(currentEvent);
-						executor->ineval(ki, 0, state, cond2);
 					}
 					break;
 				}
@@ -291,7 +286,6 @@ namespace klee {
 						if (isFloat || id == Type::IntegerTyID) {
 #endif
 							Expr::Width size = executor->getWidthForLLVMType(ki->inst->getType());
-							ref<Expr> address = executor->eval(ki, 0, state).value;
 							ref<Expr> value = executor->getDestCell(state, ki).value;
 							ref<Expr> symbolic = manualMakeSymbolic(state, currentEvent->globalName, size, isFloat);
 							executor->bindLocal(ki, state, symbolic);
@@ -316,14 +310,14 @@ namespace klee {
 					CallSite cs(inst);
 					Function *f = currentEvent->calledFunction;
 					//可能存在未知错误
-//			Value *fp = cs.getCalledValue();
-//			Function *f = executor->getTargetFunction(fp, state);
-//			if (!f) {
-//				ref<Expr> expr = executor->eval(ki, 0, state).value;
-//				ConstantExpr* constExpr = dyn_cast<ConstantExpr>(expr.get());
-//				uint64_t functionPtr = constExpr->getZExtValue();
-//				f = (Function*) functionPtr;
-//			}
+//					Value *fp = cs.getCalledValue();
+//					Function *f = executor->getTargetFunction(fp, state);
+//					if (!f) {
+//						ref<Expr> expr = executor->eval(ki, 0, state).value;
+//						ConstantExpr* constExpr = dyn_cast<ConstantExpr>(expr.get());
+//						uint64_t functionPtr = constExpr->getZExtValue();
+//						f = (Function*) functionPtr;
+//					}
 
 					if (!currentEvent->isFunctionWithSourceCode && !inst->getType()->isVoidTy()) {
 						ref<Expr> returnValue = executor->getDestCell(state, ki).value;
@@ -345,15 +339,6 @@ namespace klee {
 						kleeBr = true;
 					} else if (f->getName().startswith("klee_overshift_check")) {
 						kleeBr = true;
-					} else if (f->getName() == "pthread_create") {
-						ref<Expr> pthreadAddress = executor->eval(ki, 1, state).value;
-						ObjectPair pthreadop;
-						executor->getMemoryObject(pthreadop, state, state.currentStack->addressSpace, pthreadAddress);
-						const ObjectState* pthreados = pthreadop.second;
-						const MemoryObject* pthreadmo = pthreadop.first;
-						Expr::Width size = BIT_WIDTH;
-						ref<Expr> value = pthreados->read(0, size);
-//						cerr << "pthread id : " << value << "\n";
 					}
 					break;
 				}
