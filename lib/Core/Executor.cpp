@@ -881,7 +881,6 @@ ref<klee::ConstantExpr> Executor::evalConstant(const Constant *c) {
 const Cell& Executor::eval(KInstruction *ki, unsigned index, ExecutionState &state) const {
 	assert(index < ki->inst->getNumOperands());
 	int vnumber = ki->operands[index];
-
 	assert(vnumber != -1 && "Invalid operand to eval(), not a value or constant!");
 
 	// Determine if this is a constant or not.
@@ -891,6 +890,8 @@ const Cell& Executor::eval(KInstruction *ki, unsigned index, ExecutionState &sta
 	} else {
 		unsigned index = vnumber;
 		StackFrame &sf = state.currentStack->realStack.back();
+		std::cerr << "eval : ";
+		sf.locals[index].value->dump();
 		return sf.locals[index];
 	}
 }
@@ -898,7 +899,6 @@ const Cell& Executor::eval(KInstruction *ki, unsigned index, ExecutionState &sta
 const Cell& Executor::evalCurrent(KInstruction *ki, unsigned index, ExecutionState &state) const {
 	assert(index < ki->inst->getNumOperands());
 	int vnumber = ki->operands[index];
-
 	assert(vnumber != -1 && "Invalid operand to eval(), not a value or constant!");
 
 	// Determine if this is a constant or not.
@@ -908,6 +908,8 @@ const Cell& Executor::evalCurrent(KInstruction *ki, unsigned index, ExecutionSta
 	} else {
 		unsigned index = vnumber;
 		StackFrame &sf = state.currentThread->stack->realStack.back();
+		std::cerr << "evalCurrent : ";
+		sf.locals[index].value->dump();
 		return sf.locals[index];
 	}
 }
@@ -1293,6 +1295,8 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
+	std::cerr << "executeInstruction : ";
+	ki->inst->dump();
 	Instruction *i = ki->inst;
 	switch (i->getOpcode()) {
 		// Control flow
@@ -3019,7 +3023,9 @@ ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state, ref<Expr> e) 
 
 ObjectState *Executor::bindObjectInState(ExecutionState &state, const MemoryObject *mo, bool isLocal, const Array *array) {
 	ObjectState *os = array ? new ObjectState(mo, array) : new ObjectState(mo);
+//	std::cerr << "ObjectState *os = array ? new ObjectState(mo, array) : new ObjectState(mo);\n";
 	state.currentStack->addressSpace->bindObject(mo, os);
+//	std::cerr << "state.currentStack->addressSpace->bindObject(mo, os);\n";
 
 	// Its possible that multiple bindings of the same mo in the state
 	// will put multiple copies on this list, but it doesn't really
@@ -3434,7 +3440,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv, char **envp
 	processTree = new PTree(state);
 	state->ptreeNode = processTree->root;
 
-	listenerService->beforeRunMethodAsMain(this, *state);
+	listenerService->beforeRunMethodAsMain(this, *state, f, argvMO, arguments, argc, argv, envp);
 
 	run(*state);
 
@@ -4043,7 +4049,7 @@ unsigned Executor::executePThreadBarrierDestory(ExecutionState &state, KInstruct
 void Executor::handleInitializers(ExecutionState& initialState) {
 	for (Module::const_global_iterator i = kmodule->module->global_begin(), e = kmodule->module->global_end(); i != e; ++i) {
 		if (i->hasInitializer() && i->getName().str().at(0) != '.') {
-			std::cerr << "name : " << i->getName().str() << "\n";
+//			std::cerr << "name : " << i->getName().str() << "\n";
 			Type* type = i->getInitializer()->getType();
 			ConstantExpr* address = globalAddresses.find(i)->second.get();
 			uint64_t startAddress = address->getZExtValue();

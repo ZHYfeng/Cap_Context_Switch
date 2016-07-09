@@ -72,23 +72,54 @@ namespace klee {
 		return &rdManager;
 	}
 
-	void ListenerService::beforeRunMethodAsMain(Executor* executor, ExecutionState &state) {
+	void ListenerService::beforeRunMethodAsMain(Executor* executor, ExecutionState &state, llvm::Function *f, MemoryObject *argvMO,
+			std::vector<ref<Expr> > arguments, int argc, char **argv, char **envp) {
 
 		Module* m = executor->kmodule->module;
+		unsigned NumPtrBytes = Context::get().getPointerWidth() / 8;
+		int envc;
+		for (envc = 0; envp[envc]; ++envc);
 
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
 
 			state.currentStack = (*bit)->stack[state.currentThread->threadId];
+			state.currentStack->pushFrame(0, executor->kmodule->functionMap[f]);
 
+			for (unsigned i = 0, e = f->arg_size(); i != e; ++i)
+				executor->bindArgument(executor->kmodule->functionMap[f], i, state, arguments[i]);
+			if (argvMO) {
+				const ObjectState *argvOSCurrent = state.currentThread->addressSpace->findObject(argvMO);
+				ObjectState *argvOS = executor->bindObjectInState(state, argvMO, false);
+				for (int i = 0; i < argc + 1 + envc + 1 + 1; i++) {
+					if (i == argc || i >= argc + 1 + envc) {
+						// Write NULL pointer
+						argvOS->write(i * NumPtrBytes, Expr::createPointer(0));
+					} else {
+						char *s = i < argc ? argv[i] : envp[i - (argc + 1)];
+						int j, len = strlen(s);
+						ref<Expr> argAddr = argvOSCurrent->read(i * NumPtrBytes, Context::get().getPointerWidth());
+						ObjectPair op;
+						bool success = executor->getMemoryObject(op, state, state.currentThread->addressSpace, argAddr);
+						if (success) {
+							const MemoryObject *arg = op.first;
+							ObjectState *os = executor->bindObjectInState(state, arg, false);
+							for (j = 0; j < len + 1; j++){
+								os->write8(j, s[j]);
+							}
+							argvOS->write(i * NumPtrBytes, arg->getBaseExpr());
+						}
+					}
+				}
+			}
+
+//			std::cerr << (*bit)->kind << "\n";
 			for (llvm::Module::const_global_iterator i = m->global_begin(), e = m->global_end(); i != e; ++i) {
 				if (i->isDeclaration()) {
-
+//					std::cerr << "i->isDeclaration()\n";
 					LLVM_TYPE_Q Type *ty = i->getType()->getElementType();
 					uint64_t size = executor->kmodule->targetData->getTypeStoreSize(ty);
-
 					MemoryObject *mo = executor->globalObjects.find(i)->second;
 					ObjectState *os = executor->bindObjectInState(state, mo, false);
-
 					if (size) {
 						void *addr;
 						if (i->getName() == "__dso_handle") {
@@ -100,9 +131,11 @@ namespace klee {
 							os->write8(offset, ((unsigned char*) addr)[offset]);
 					}
 				} else {
+//					std::cerr << "!i->isDeclaration()\n";
 					MemoryObject *mo = executor->globalObjects.find(i)->second;
+//					std::cerr << "MemoryObject *mo = executor->globalObjects.find(i)->second;\n";
 					ObjectState *os = executor->bindObjectInState(state, mo, false);
-
+//					std::cerr << "ObjectState *os = executor->bindObjectInState(state, mo, false);\n";
 					if (!i->hasInitializer())
 						os->initializeToRandom();
 				}
@@ -168,15 +201,21 @@ namespace klee {
 
 	void ListenerService::executeInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
 
+		std::cerr << " thread id : " << state.currentThread->threadId;
+		ki->inst->dump();
+
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
 			state.currentStack = (*bit)->stack[state.currentThread->threadId];
+
 			state.currentStack = state.currentThread->stack;
 		}
 
 		Instruction *i = ki->inst;
+
 		switch (i->getOpcode()) {
 			case Instruction::Ret: {
-				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie;
+						++bit) {
 					state.currentStack = (*bit)->stack[state.currentThread->threadId];
 					ReturnInst *ri = cast<ReturnInst>(i);
 					KInstIterator kcaller = state.currentStack->realStack.back().caller;
@@ -193,7 +232,8 @@ namespace klee {
 							Expr::Width from = result->getWidth();
 							Expr::Width to = executor->getWidthForLLVMType(t);
 							if (from != to) {
-								CallSite cs = (isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
+								CallSite cs = (
+										isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
 								bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
 								if (isSExt) {
 									result = SExtExpr::create(result, to);
@@ -211,7 +251,8 @@ namespace klee {
 
 			case Instruction::Invoke:
 			case Instruction::Call: {
-				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie;
+						++bit) {
 					state.currentStack = (*bit)->stack[state.currentThread->threadId];
 
 					CallSite cs(i);
@@ -220,8 +261,13 @@ namespace klee {
 					Function *f = executor->getTargetFunction(fp, state);
 					std::vector<ref<Expr> > arguments;
 					arguments.reserve(numArgs);
-					for (unsigned j = 0; j < numArgs; ++j)
+					for (unsigned j = 0; j < numArgs; ++j) {
+						std::cerr << "j : " << j << "\n";
+						executor->evalCurrent(ki, j + 1, state).value->dump();
+						executor->eval(ki, j + 1, state).value->dump();
 						arguments.push_back(executor->eval(ki, j + 1, state).value);
+					}
+//					std::cerr << "arguments.reserve(numArgs);\n";
 					if (f) {
 						const FunctionType *fType = dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
 						const FunctionType *fpType = dyn_cast<FunctionType>(cast<PointerType>(fp->getType())->getElementType());
@@ -275,7 +321,8 @@ namespace klee {
 											stack->realStack.reserve(10);
 											stack->pushFrame(0, kthreadEntrance);
 										}
-									} else if (f->getName().str() == "malloc" || f->getName().str() == "_ZdaPv" || f->getName().str() == "_Znaj" || f->getName().str() == "_Znam"
+									} else if (f->getName().str() == "malloc" || f->getName().str() == "_ZdaPv"
+											|| f->getName().str() == "_Znaj" || f->getName().str() == "_Znam"
 											|| f->getName().str() == "valloc") {
 										ref<Expr> size = arguments[0];
 										bool isLocal = true;
@@ -293,7 +340,8 @@ namespace klee {
 												executor->bindLocal(ki, state, ConstantExpr::alloc(0, Context::get().getPointerWidth()));
 											}
 										}
-									} else if (f->getName().str() == "_ZdlPv" || f->getName().str() == "_Znwj" || f->getName().str() == "_Znwm" || f->getName().str() == "free") {
+									} else if (f->getName().str() == "_ZdlPv" || f->getName().str() == "_Znwj"
+											|| f->getName().str() == "_Znwm" || f->getName().str() == "free") {
 										ref<Expr> address = arguments[0];
 										Executor::StatePair zeroPointer = executor->fork(state, Expr::createIsZero(address), true);
 										if (zeroPointer.first) {
@@ -306,9 +354,11 @@ namespace klee {
 											for (Executor::ExactResolutionList::iterator it = rl.begin(), ie = rl.end(); it != ie; ++it) {
 												const MemoryObject *mo = it->first.first;
 												if (mo->isLocal) {
-													executor->terminateStateOnError(*it->second, "free of alloca", "free.err", executor->getAddressInfo(*it->second, address));
+													executor->terminateStateOnError(*it->second, "free of alloca", "free.err",
+															executor->getAddressInfo(*it->second, address));
 												} else if (mo->isGlobal) {
-													executor->terminateStateOnError(*it->second, "free of global", "free.err", executor->getAddressInfo(*it->second, address));
+													executor->terminateStateOnError(*it->second, "free of global", "free.err",
+															executor->getAddressInfo(*it->second, address));
 												} else {
 													it->second->currentStack->addressSpace->unbindObject(mo);
 													if (ki)
@@ -350,9 +400,14 @@ namespace klee {
 										executor->executeMemoryOperation(state, true, arguments[0], sf.varargs->getBaseExpr(), 0);
 									} else {
 										executor->executeMemoryOperation(state, true, arguments[0], ConstantExpr::create(48, 32), 0); // gp_offset
-										executor->executeMemoryOperation(state, true, AddExpr::create(arguments[0], ConstantExpr::create(4, 64)), ConstantExpr::create(304, 32), 0); // fp_offset
-										executor->executeMemoryOperation(state, true, AddExpr::create(arguments[0], ConstantExpr::create(8, 64)), sf.varargs->getBaseExpr(), 0); // overflow_arg_area
-										executor->executeMemoryOperation(state, true, AddExpr::create(arguments[0], ConstantExpr::create(16, 64)), ConstantExpr::create(0, 64), 0); // reg_save_area
+										executor->executeMemoryOperation(state, true,
+												AddExpr::create(arguments[0], ConstantExpr::create(4, 64)), ConstantExpr::create(304, 32),
+												0); // fp_offset
+										executor->executeMemoryOperation(state, true,
+												AddExpr::create(arguments[0], ConstantExpr::create(8, 64)), sf.varargs->getBaseExpr(), 0); // overflow_arg_area
+										executor->executeMemoryOperation(state, true,
+												AddExpr::create(arguments[0], ConstantExpr::create(16, 64)), ConstantExpr::create(0, 64),
+												0); // reg_save_area
 									}
 									break;
 								}
@@ -414,7 +469,8 @@ namespace klee {
 					bool success = executor->getMemoryObject(op, state, state.currentThread->addressSpace, addr);
 					if (success) {
 						const MemoryObject *mo = op.first;
-						for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+						for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end();
+								bit != bie; ++bit) {
 							state.currentStack = (*bit)->stack[state.currentThread->threadId];
 							ObjectState *os = executor->bindObjectInState(state, mo, isLocal);
 							os->initializeToRandom();
@@ -422,7 +478,8 @@ namespace klee {
 							state.currentStack = state.currentThread->stack;
 						}
 					} else {
-						for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+						for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end();
+								bit != bie; ++bit) {
 							state.currentStack = (*bit)->stack[state.currentThread->threadId];
 							executor->bindLocal(ki, state, ConstantExpr::alloc(0, Context::get().getPointerWidth()));
 							state.currentStack = state.currentThread->stack;
@@ -438,7 +495,8 @@ namespace klee {
 			}
 
 			default: {
-				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie;
+						++bit) {
 					state.currentStack = (*bit)->stack[state.currentThread->threadId];
 					executor->executeInstruction(state, ki);
 					state.currentStack = state.currentThread->stack;

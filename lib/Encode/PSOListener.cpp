@@ -118,7 +118,8 @@ namespace klee {
 					f = (Function*) functionPtr;
 				}
 				item->calledFunction = f;
-				if (f && f->isDeclaration() && f->getIntrinsicID() == Intrinsic::not_intrinsic && kmodule->internalFunctions.find(f) == kmodule->internalFunctions.end()) {
+				if (f && f->isDeclaration() && f->getIntrinsicID() == Intrinsic::not_intrinsic
+						&& kmodule->internalFunctions.find(f) == kmodule->internalFunctions.end()) {
 					item->isFunctionWithSourceCode = false;
 				}
 //		std::cerr<<"isFunctionWithSourceCode : "<<item->isFunctionWithSourceCode<<"\n";
@@ -334,7 +335,8 @@ namespace klee {
 				//目前只处理一维数组,多维数组及指针数组赞不考虑，该处理函数存在问题
 				//ylc
 				KGEPInstruction *kgepi = static_cast<KGEPInstruction*>(ki);
-				for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie; ++it) {
+				for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie;
+						++it) {
 					ref<Expr> index = executor->eval(ki, it->first, state).value;
 //			std::cerr << "kgepi->index : " << index << std::endl;
 					item->instParameter.push_back(index);
@@ -436,6 +438,7 @@ namespace klee {
 #endif
 							trace->insertWriteSet(varName, item);
 						}
+					} else {
 						cerr << "Store address = " << realAddress->getZExtValue() << endl;
 						assert(0 && "store resolve unsuccess");
 					}
@@ -594,7 +597,7 @@ namespace klee {
 				}
 
 				default: {
-					cerr << caggregate->getType()->getTypeID() << endl;
+					std::cerr << caggregate->getType()->getTypeID() << std::endl;
 					assert(0 && "unknown aggregatezero type");
 				}
 
@@ -635,7 +638,7 @@ namespace klee {
 				handleInitializer(element, mo, startAddress);
 			}
 		} else {
-			cerr << "value = " << initializer->getValueID() << " type = " << initializer->getType()->getTypeID() << endl;
+//			std::cerr << "value = " << initializer->getValueID() << " type = " << initializer->getType()->getTypeID() << std::endl;
 //			assert(0 && "unsupported initializer");
 		}
 	}
@@ -654,7 +657,7 @@ namespace klee {
 			}
 
 			default: {
-				cerr << expr->getOpcode() << endl;
+//				cerr << expr->getOpcode() << endl;
 //				assert(0 && "unsupported Opcode");
 			}
 

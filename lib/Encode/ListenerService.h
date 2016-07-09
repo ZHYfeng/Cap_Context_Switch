@@ -43,7 +43,8 @@ namespace klee {
 			RuntimeDataManager* getRuntimeDataManager();
 
 			void Preparation();
-			void beforeRunMethodAsMain(Executor* executor, ExecutionState &state);
+			void beforeRunMethodAsMain(Executor* executor, ExecutionState &state, llvm::Function *f, MemoryObject *argvMO,
+					std::vector<ref<Expr> > arguments, int argc, char **argv, char **envp);
 			void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki);
 			void afterExecuteInstruction(ExecutionState &state, KInstruction *ki);
 			void afterRunMethodAsMain(ExecutionState &state);
