@@ -932,6 +932,9 @@ void Executor::ineval(KInstruction *ki, unsigned index, ExecutionState &state, r
 }
 
 void Executor::bindLocal(KInstruction *target, ExecutionState &state, ref<Expr> value) {
+	std::cerr << "target->dest : " << target->dest << std::endl;
+	std::cerr << "value address : " << value.get() <<std::endl;
+	std::cerr << "address : " << getDestCell(state, target).value.get() <<std::endl;
 	getDestCell(state, target).value = value;
 }
 
@@ -951,7 +954,6 @@ ref<Expr> Executor::toUnique(const ExecutionState &state, ref<Expr> &e) {
 			result = value;
 		solver->setTimeout(0);
 	}
-
 	return result;
 }
 
@@ -1123,7 +1125,6 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
 		state.currentStack->pushFrame(state.currentThread->prevPC, kf);
 		state.currentThread->pc = kf->instructions;
 
-		if (statsTracker)
 			statsTracker->framePushed(state, &state.currentStack->realStack[state.currentStack->realStack.size() - 2]);
 
 		// TODO: support "byval" parameter attribute
@@ -1295,8 +1296,7 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
-	std::cerr << "executeInstruction : ";
-	ki->inst->dump();
+	std::cerr << "executeInstruction : " << std::endl;
 	Instruction *i = ki->inst;
 	switch (i->getOpcode()) {
 		// Control flow
@@ -2710,13 +2710,11 @@ void Executor::run(ExecutionState &initialState) {
 		}
 		stepInstruction(state);
 
-		listenerService->beforeExecuteInstruction(state, ki);
+		listenerService->beforeExecuteInstruction(this, state, ki);
 
 		executeInstruction(state, ki);
 
-		listenerService->executeInstruction(this, state, ki);
-
-		listenerService->afterExecuteInstruction(state, ki);
+		listenerService->afterExecuteInstruction(this, state, ki);
 
 		if (prefix) {
 			prefix->increasePosition();

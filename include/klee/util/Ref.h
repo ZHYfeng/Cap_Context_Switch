@@ -18,7 +18,7 @@ using llvm::dyn_cast;
 using llvm::dyn_cast_or_null;
 
 #include <assert.h>
-#include <iosfwd> // FIXME: Remove this!!!
+#include <iostream>
 
 namespace llvm {
   class raw_ostream;
@@ -42,7 +42,7 @@ private:
   }
 
   void dec() const {
-    if (ptr && --ptr->refCount == 0)
+	if (ptr && --ptr->refCount == 0)
       delete ptr;
   }
 
