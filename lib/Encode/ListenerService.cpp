@@ -601,8 +601,8 @@ namespace klee {
 
 		BitcodeListener* PSOlistener = new PSOListener(executor, &rdManager);
 		pushListener(PSOlistener);
-//		BitcodeListener* Symboliclistener = new SymbolicListener(executor, &rdManager);
-//		pushListener(Symboliclistener);
+		BitcodeListener* Symboliclistener = new SymbolicListener(executor, &rdManager);
+		pushListener(Symboliclistener);
 //		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
 //		pushListener(Taintlistener);
 
