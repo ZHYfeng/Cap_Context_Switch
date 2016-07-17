@@ -890,8 +890,7 @@ const Cell& Executor::eval(KInstruction *ki, unsigned index, ExecutionState &sta
 	} else {
 		unsigned index = vnumber;
 		StackFrame &sf = state.currentStack->realStack.back();
-		std::cerr << "eval : ";
-		sf.locals[index].value->dump();
+		std::cerr << "eval index : " << index << std::endl;
 		return sf.locals[index];
 	}
 }
@@ -908,8 +907,7 @@ const Cell& Executor::evalCurrent(KInstruction *ki, unsigned index, ExecutionSta
 	} else {
 		unsigned index = vnumber;
 		StackFrame &sf = state.currentThread->stack->realStack.back();
-		std::cerr << "evalCurrent : ";
-		sf.locals[index].value->dump();
+		std::cerr << "evalCurrent index : " << index << std::endl;
 		return sf.locals[index];
 	}
 }
@@ -927,14 +925,14 @@ void Executor::ineval(KInstruction *ki, unsigned index, ExecutionState &state, r
 	} else {
 		unsigned index = vnumber;
 		StackFrame &sf = state.currentStack->realStack.back();
+		std::cerr << "ineval index : " << index << std::endl;
 		sf.locals[index].value = value;
 	}
 }
 
 void Executor::bindLocal(KInstruction *target, ExecutionState &state, ref<Expr> value) {
-	std::cerr << "target->dest : " << target->dest << std::endl;
 	std::cerr << "value address : " << value.get() <<std::endl;
-	std::cerr << "address : " << getDestCell(state, target).value.get() <<std::endl;
+	std::cerr << "getDestCell address : " << getDestCell(state, target).value.get() <<std::endl;
 	getDestCell(state, target).value = value;
 }
 

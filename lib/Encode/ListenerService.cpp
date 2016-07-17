@@ -603,8 +603,8 @@ namespace klee {
 		pushListener(PSOlistener);
 		BitcodeListener* Symboliclistener = new SymbolicListener(executor, &rdManager);
 		pushListener(Symboliclistener);
-//		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
-//		pushListener(Taintlistener);
+		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
+		pushListener(Taintlistener);
 
 		gettimeofday(&start, NULL);
 

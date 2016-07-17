@@ -309,14 +309,17 @@ namespace klee {
 			void ineval(KInstruction *ki, unsigned index, ExecutionState &state, ref<Expr> value) const;
 
 			Cell& getArgumentCell(ExecutionState &state, KFunction *kf, unsigned index) {
+				std::cerr << "getArgumentCell index : " << kf->getArgRegister(index) << std::endl;
 				return state.currentStack->realStack.back().locals[kf->getArgRegister(index)];
 			}
 
 			Cell& getDestCell(ExecutionState &state, KInstruction *target) {
+				std::cerr << "getDestCell index : " << target->dest << std::endl;
 				return state.currentStack->realStack.back().locals[target->dest];
 			}
 
 			Cell& getCurrentDestCell(ExecutionState &state, KInstruction *target) {
+				std::cerr << "getCurrentDestCell index : " << target->dest << std::endl;
 				return state.currentThread->stack->realStack.back().locals[target->dest];
 			}
 

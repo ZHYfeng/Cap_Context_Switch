@@ -21,127 +21,144 @@ using llvm::dyn_cast_or_null;
 #include <iostream>
 
 namespace llvm {
-  class raw_ostream;
+	class raw_ostream;
 }
 
 namespace klee {
 
-template<class T>
-class ref {
-  T *ptr;
+	template<class T>
+	class ref {
+			T *ptr;
 
-public:
-  // default constructor: create a NULL reference
-  ref() : ptr(0) { }
-  ~ref () { dec (); }
+		public:
+			// default constructor: create a NULL reference
+			ref() :
+					ptr(0) {
+			}
+			~ref() {
+				dec();
+			}
 
-private:
-  void inc() const {
-    if (ptr)
-      ++ptr->refCount;
-  }
+		private:
+			void inc() const {
+				if (ptr)
+					++ptr->refCount;
+			}
 
-  void dec() const {
-	if (ptr && --ptr->refCount == 0)
-      delete ptr;
-  }
+			void dec() const {
+				if (ptr && --ptr->refCount == 0) {
+					delete ptr;
+				}
+			}
 
-public:
-  template<class U> friend class ref;
+		public:
+			template<class U> friend class ref;
 
-  // constructor from pointer
-  ref(T *p) : ptr(p) {
-    inc();
-  }
+			// constructor from pointer
+			ref(T *p) :
+					ptr(p) {
+				inc();
+			}
 
-  // normal copy constructor
-  ref(const ref<T> &r) : ptr(r.ptr) {
-    inc();
-  }
+			// normal copy constructor
+			ref(const ref<T> &r) :
+					ptr(r.ptr) {
+				inc();
+			}
 
-  // conversion constructor
-  template<class U>
-  ref (const ref<U> &r) : ptr(r.ptr) {
-    inc();
-  }
+			// conversion constructor
+			template<class U>
+			ref(const ref<U> &r) :
+					ptr(r.ptr) {
+				inc();
+			}
 
-  // pointer operations
-  T *get () const {
-    return ptr;
-  }
+			// pointer operations
+			T *get() const {
+				return ptr;
+			}
 
-  /* The copy assignment operator must also explicitly be defined,
-   * despite a redundant template. */
-  ref<T> &operator= (const ref<T> &r) {
-    r.inc();
-    dec();
-    ptr = r.ptr;
+			/* The copy assignment operator must also explicitly be defined,
+			 * despite a redundant template. */
+			ref<T> &operator=(const ref<T> &r) {
+				std::cerr << "ptr : " << ptr << " r : " << r.get() << std::endl;
+				r.inc();
+				dec();
+				ptr = r.ptr;
+				return *this;
+			}
 
-    return *this;
-  }
+			template<class U> ref<T> &operator=(const ref<U> &r) {
+				std::cerr << "ptr : " << ptr << " r : " << r.get() << std::endl;
+				r.inc();
+				dec();
+				ptr = r.ptr;
 
-  template<class U> ref<T> &operator= (const ref<U> &r) {
-    r.inc();
-    dec();
-    ptr = r.ptr;
+				return *this;
+			}
 
-    return *this;
-  }
+			T& operator*() const {
+				return *ptr;
+			}
 
-  T& operator*() const {
-    return *ptr;
-  }
+			T* operator->() const {
+				return ptr;
+			}
 
-  T* operator->() const {
-    return ptr;
-  }
+			bool isNull() const {
+				return ptr == 0;
+			}
 
-  bool isNull() const { return ptr == 0; }
+			// assumes non-null arguments
+			int compare(const ref &rhs) const {
+				assert(!isNull() && !rhs.isNull() && "Invalid call to compare()");
+				return get()->compare(*rhs.get());
+			}
 
-  // assumes non-null arguments
-  int compare(const ref &rhs) const {
-    assert(!isNull() && !rhs.isNull() && "Invalid call to compare()");
-    return get()->compare(*rhs.get());
-  }
+			// assumes non-null arguments
+			bool operator<(const ref &rhs) const {
+				return compare(rhs) < 0;
+			}
+			bool operator==(const ref &rhs) const {
+				return compare(rhs) == 0;
+			}
+			bool operator!=(const ref &rhs) const {
+				return compare(rhs) != 0;
+			}
+	};
 
-  // assumes non-null arguments
-  bool operator<(const ref &rhs) const { return compare(rhs)<0; }
-  bool operator==(const ref &rhs) const { return compare(rhs)==0; }
-  bool operator!=(const ref &rhs) const { return compare(rhs)!=0; }
-};
+	template<class T>
+	inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ref<T> &e) {
+		os << *e;
+		return os;
+	}
 
-template<class T>
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const ref<T> &e) {
-  os << *e;
-  return os;
-}
-
-template<class T>
-inline std::stringstream &operator<<(std::stringstream &os, const ref<T> &e) {
-  os << *e;
-  return os;
-}
+	template<class T>
+	inline std::stringstream &operator<<(std::stringstream &os, const ref<T> &e) {
+		os << *e;
+		return os;
+	}
 
 } // end namespace klee
 
 namespace llvm {
-  // simplify_type implementation for ref<>, which allows dyn_cast from on a
-  // ref<> to apply to the wrapper type. Conceptually the result of such a
-  // dyn_cast should probably be a ref of the casted type, but that breaks the
-  // idiom of initializing a variable to the result of a dyn_cast inside an if
-  // condition, or we would have to implement operator(bool) for ref<> with
-  // isNull semantics, which doesn't seem like a good idea.
-template<typename T>
-struct simplify_type<const ::klee::ref<T> > {
-  typedef T* SimpleType;
-  static SimpleType getSimplifiedValue(const ::klee::ref<T> &Ref) {
-    return Ref.get();
-  }
-};
+	// simplify_type implementation for ref<>, which allows dyn_cast from on a
+	// ref<> to apply to the wrapper type. Conceptually the result of such a
+	// dyn_cast should probably be a ref of the casted type, but that breaks the
+	// idiom of initializing a variable to the result of a dyn_cast inside an if
+	// condition, or we would have to implement operator(bool) for ref<> with
+	// isNull semantics, which doesn't seem like a good idea.
+	template<typename T>
+	struct simplify_type<const ::klee::ref<T> > {
+			typedef T* SimpleType;
+			static SimpleType getSimplifiedValue(const ::klee::ref<T> &Ref) {
+				return Ref.get();
+			}
+	};
 
-template<typename T>
-struct simplify_type< ::klee::ref<T> >
-  : public simplify_type<const ::klee::ref<T> > {};
+	template<typename T>
+	struct simplify_type< ::klee::ref<T> > : public simplify_type<const ::klee::ref<T> > {
+	};
 }
 
 #endif /* KLEE_REF_H */
