@@ -188,26 +188,37 @@ namespace klee {
 					if (!isVoidReturn) {
 						result = executor->eval(ki, 0, state).value;
 					}
-					state.currentStack->popFrame();
-					if (!isVoidReturn) {
-						LLVM_TYPE_Q Type *t = caller->getType();
-						if (t != Type::getVoidTy(getGlobalContext())) {
-							Expr::Width from = result->getWidth();
-							Expr::Width to = executor->getWidthForLLVMType(t);
-							if (from != to) {
-								CallSite cs = (
-										isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
-								bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
-								if (isSExt) {
-									result = SExtExpr::create(result, to);
-								} else {
-									result = ZExtExpr::create(result, to);
+					if (state.currentStack->realStack.size() <= 1) {
+
+					} else {
+						std::cerr << "Ret : \n";
+						state.currentStack->popFrame();
+						std::cerr << "Ret : \n";
+						if (!isVoidReturn) {
+							std::cerr << "Ret : !isVoidReturn\n";
+							LLVM_TYPE_Q Type *t = caller->getType();
+							std::cerr << "Ret : !isVoidReturn\n";
+							if (t != Type::getVoidTy(getGlobalContext())) {
+								std::cerr << "Ret : t != Type::getVoidTy(getGlobalContext())\n";
+								Expr::Width from = result->getWidth();
+								Expr::Width to = executor->getWidthForLLVMType(t);
+								if (from != to) {
+									CallSite cs = (
+											isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
+									bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
+									if (isSExt) {
+										result = SExtExpr::create(result, to);
+									} else {
+										result = ZExtExpr::create(result, to);
+									}
 								}
+								std::cerr << "Ret : bindLocal\n";
+								executor->bindLocal(kcaller, state, result);
 							}
-							executor->bindLocal(kcaller, state, result);
 						}
+						std::cerr << "Ret : \n";
+						state.currentStack = state.currentThread->stack;
 					}
-					state.currentStack = state.currentThread->stack;
 				}
 				break;
 			}
@@ -347,38 +358,6 @@ namespace klee {
 
 		switch (i->getOpcode()) {
 			case Instruction::Ret: {
-				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie;
-						++bit) {
-					state.currentStack = (*bit)->stack[state.currentThread->threadId];
-					ReturnInst *ri = cast<ReturnInst>(i);
-					KInstIterator kcaller = state.currentStack->realStack.back().caller;
-					Instruction *caller = kcaller ? kcaller->inst : 0;
-					bool isVoidReturn = (ri->getNumOperands() == 0);
-					ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
-					if (!isVoidReturn) {
-						result = executor->eval(ki, 0, state).value;
-					}
-					state.currentStack->popFrame();
-					if (!isVoidReturn) {
-						LLVM_TYPE_Q Type *t = caller->getType();
-						if (t != Type::getVoidTy(getGlobalContext())) {
-							Expr::Width from = result->getWidth();
-							Expr::Width to = executor->getWidthForLLVMType(t);
-							if (from != to) {
-								CallSite cs = (
-										isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
-								bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
-								if (isSExt) {
-									result = SExtExpr::create(result, to);
-								} else {
-									result = ZExtExpr::create(result, to);
-								}
-							}
-							executor->bindLocal(kcaller, state, result);
-						}
-					}
-					state.currentStack = state.currentThread->stack;
-				}
 				break;
 			}
 
@@ -575,12 +554,7 @@ namespace klee {
 
 	void ListenerService::afterRunMethodAsMain(ExecutionState &state) {
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
-
-			state.currentStack = (*bit)->stack[state.currentThread->threadId];
-
 			(*bit)->afterRunMethodAsMain(state);
-
-			state.currentStack = state.currentThread->stack;
 		}
 	}
 
@@ -644,7 +618,7 @@ namespace klee {
 		executor->getNewPrefix();
 
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
-			delete *bit;
+//			delete *bit;
 		}
 
 		delete encode;

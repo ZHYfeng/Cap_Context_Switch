@@ -12,6 +12,7 @@
 #include <map>
 #include <sstream>
 #include <utility>
+#include <fstream>
 
 
 using namespace std;
@@ -47,6 +48,7 @@ RuntimeDataManager::~RuntimeDataManager() {
 		delete *ti;
 	}
 	string ErrorInfo;
+	system("mkdir ./output_info");
 	raw_fd_ostream out_to_file("./output_info/statics.txt", ErrorInfo, sys::fs::F_Append);
 	stringstream ss;
 	ss << "AllFormulaNum:" << allFormulaNum << "\n";

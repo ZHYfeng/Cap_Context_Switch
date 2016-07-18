@@ -57,12 +57,14 @@ namespace klee {
 			// constructor from pointer
 			ref(T *p) :
 					ptr(p) {
+				std::cerr << "ptr : " << ptr << " p : " << p << std::endl;
 				inc();
 			}
 
 			// normal copy constructor
 			ref(const ref<T> &r) :
 					ptr(r.ptr) {
+				std::cerr << "ptr : " << ptr << " r : " << r.get() << std::endl;
 				inc();
 			}
 
@@ -70,6 +72,7 @@ namespace klee {
 			template<class U>
 			ref(const ref<U> &r) :
 					ptr(r.ptr) {
+				std::cerr << "ptr : " << ptr << " r : " << r.get() << std::endl;
 				inc();
 			}
 
