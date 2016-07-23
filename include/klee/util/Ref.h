@@ -57,14 +57,12 @@ namespace klee {
 			// constructor from pointer
 			ref(T *p) :
 					ptr(p) {
-				std::cerr << "ptr : " << ptr << " p : " << p << std::endl;
 				inc();
 			}
 
 			// normal copy constructor
 			ref(const ref<T> &r) :
 					ptr(r.ptr) {
-				std::cerr << "ptr : " << ptr << " r : " << r.get() << std::endl;
 				inc();
 			}
 
@@ -72,7 +70,6 @@ namespace klee {
 			template<class U>
 			ref(const ref<U> &r) :
 					ptr(r.ptr) {
-				std::cerr << "ptr : " << ptr << " r : " << r.get() << std::endl;
 				inc();
 			}
 
@@ -84,7 +81,6 @@ namespace klee {
 			/* The copy assignment operator must also explicitly be defined,
 			 * despite a redundant template. */
 			ref<T> &operator=(const ref<T> &r) {
-				std::cerr << "ptr : " << ptr << " r : " << r.get() << std::endl;
 				r.inc();
 				dec();
 				ptr = r.ptr;
@@ -92,7 +88,6 @@ namespace klee {
 			}
 
 			template<class U> ref<T> &operator=(const ref<U> &r) {
-				std::cerr << "ptr : " << ptr << " r : " << r.get() << std::endl;
 				r.inc();
 				dec();
 				ptr = r.ptr;

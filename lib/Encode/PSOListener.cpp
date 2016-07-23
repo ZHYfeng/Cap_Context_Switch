@@ -416,6 +416,11 @@ namespace klee {
 				ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address.get());
 				if (realAddress) {
 					uint64_t key = realAddress->getZExtValue();
+					Type* valueTy = ki->inst->getOperand(0)->getType();
+					if (valueTy->isPointerTy()) {
+						valueTy = valueTy->getPointerElementType();
+						executor->createSpecialElement(state, valueTy, key, false);
+					}
 					ObjectPair op;
 					bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 					if (success) {

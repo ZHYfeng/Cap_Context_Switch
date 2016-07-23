@@ -55,11 +55,16 @@ bool AddressSpace::resolveOne(const ref<ConstantExpr> &addr,
                               ObjectPair &result) {
   uint64_t address = addr->getZExtValue();
   MemoryObject hack(address);
-
+//  std::cerr << "objects.dump()" << "\n";
+//  objects.dump();
+//  std::cerr << "address : " << address << "\n";
   if (const MemoryMap::value_type *res = objects.lookup_previous(&hack)) {
+//	  std::cerr << "const MemoryMap::value_type *res = objects.lookup_previous(&hack)\n";
     const MemoryObject *mo = res->first;
+//    std::cerr << "mo->address : " << mo->address << " mo->size : " << mo->size << "\n";
     if ((mo->size==0 && address==mo->address) ||
         (address - mo->address < mo->size)) {
+//    	std::cerr << "(mo->size==0 && address==mo->address) || (address - mo->address < mo->size)\n";
       result = *res;
       return true;
     }
@@ -330,6 +335,7 @@ bool AddressSpace::copyInConcretes() {
 /***/
 
 bool MemoryObjectLT::operator()(const MemoryObject *a, const MemoryObject *b) const {
-  return a->address < b->address;
+//	std::cerr << "a->address : " << a->address << " b->address : " << b->address << "\n";
+	return a->address < b->address;
 }
 

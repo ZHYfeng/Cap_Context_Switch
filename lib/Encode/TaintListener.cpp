@@ -85,7 +85,8 @@ namespace klee {
 					}
 
 					ref<Expr> value = executor->eval(ki, 0, state).value;
-//			cerr << "value : " << value << "\n";
+//					cerr << "value : ";
+//					value->dump();
 					bool isTaint = value->isTaint;
 					std::vector<ref<klee::Expr> >* relatedSymbolicExpr = &(currentEvent->relatedSymbolicExpr);
 					filter.resolveTaintExpr(value, currentEvent->relatedSymbolicExpr, isTaint);

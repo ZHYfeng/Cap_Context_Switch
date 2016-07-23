@@ -41,6 +41,9 @@ RuntimeDataManager::RuntimeDataManager() :
 	DTAMParallelCost = 0;
 	DTAMhybridCost = 0;
 
+	system("rm -rf ./output_info");
+	system("mkdir ./output_info");
+
 }
 
 RuntimeDataManager::~RuntimeDataManager() {
@@ -48,7 +51,6 @@ RuntimeDataManager::~RuntimeDataManager() {
 		delete *ti;
 	}
 	string ErrorInfo;
-	system("mkdir ./output_info");
 	raw_fd_ostream out_to_file("./output_info/statics.txt", ErrorInfo, sys::fs::F_Append);
 	stringstream ss;
 	ss << "AllFormulaNum:" << allFormulaNum << "\n";

@@ -160,6 +160,10 @@ namespace klee {
 
 	void ListenerService::beforeExecuteInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
 
+//		std::cerr << "thread id : " << state.currentThread->threadId << "  ";
+//		ki->inst->dump();
+		//		std::cerr << " before : " << std::endl;
+
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
 
 			state.currentStack = (*bit)->stack[state.currentThread->threadId];
@@ -168,10 +172,6 @@ namespace klee {
 
 			state.currentStack = state.currentThread->stack;
 		}
-
-		std::cerr << " thread id : " << state.currentThread->threadId << std::endl;
-		ki->inst->dump();
-		std::cerr << " before : " << std::endl;
 
 		Instruction *i = ki->inst;
 
@@ -191,15 +191,12 @@ namespace klee {
 					if (state.currentStack->realStack.size() <= 1) {
 
 					} else {
-						std::cerr << "Ret : \n";
+//						std::cerr << " state.currentStack->popFrame();state.currentStack->popFrame(); : " << std::endl;
 						state.currentStack->popFrame();
-						std::cerr << "Ret : \n";
+//						std::cerr << " state.currentStack->popFrame(); : " << std::endl;
 						if (!isVoidReturn) {
-							std::cerr << "Ret : !isVoidReturn\n";
 							LLVM_TYPE_Q Type *t = caller->getType();
-							std::cerr << "Ret : !isVoidReturn\n";
 							if (t != Type::getVoidTy(getGlobalContext())) {
-								std::cerr << "Ret : t != Type::getVoidTy(getGlobalContext())\n";
 								Expr::Width from = result->getWidth();
 								Expr::Width to = executor->getWidthForLLVMType(t);
 								if (from != to) {
@@ -212,11 +209,9 @@ namespace klee {
 										result = ZExtExpr::create(result, to);
 									}
 								}
-								std::cerr << "Ret : bindLocal\n";
 								executor->bindLocal(kcaller, state, result);
 							}
 						}
-						std::cerr << "Ret : \n";
 						state.currentStack = state.currentThread->stack;
 					}
 				}
@@ -235,9 +230,6 @@ namespace klee {
 					Function *f = executor->getTargetFunction(fp, state);
 					arguments.reserve(numArgs);
 					for (unsigned j = 0; j < numArgs; ++j) {
-						std::cerr << "j : " << j << "\n";
-						executor->evalCurrent(ki, j + 1, state).value;
-						executor->eval(ki, j + 1, state).value;
 						arguments.push_back(executor->eval(ki, j + 1, state).value);
 					}
 //					std::cerr << "arguments.reserve(numArgs);\n";
@@ -264,7 +256,7 @@ namespace klee {
 						}
 						if (f && f->isDeclaration()) {
 							switch (f->getIntrinsicID()) {
-								case Intrinsic::not_intrinsic:{
+								case Intrinsic::not_intrinsic: {
 									break;
 								}
 								case Intrinsic::vastart: {
@@ -352,7 +344,7 @@ namespace klee {
 
 	void ListenerService::afterExecuteInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
 
-		std::cerr << " after : " << std::endl;
+//		std::cerr << " after : " << std::endl;
 
 		Instruction *i = ki->inst;
 
@@ -385,7 +377,6 @@ namespace klee {
 											threadEntrance = (Function*) (functionPtr->getZExtValue());
 										}
 										KFunction *kthreadEntrance = executor->kmodule->functionMap[threadEntrance];
-										executor->bindArgument(kthreadEntrance, 0, state, arguments[3]);
 										Expr::Width type = executor->getWidthForLLVMType(ki->inst->getType());
 										ref<Expr> address = arguments[0];
 										ObjectPair op;
@@ -402,12 +393,16 @@ namespace klee {
 											(*bit)->stack[dyn_cast<ConstantExpr>(threadID)->getAPValue().getSExtValue()] = stack;
 											stack->realStack.reserve(10);
 											stack->pushFrame(0, kthreadEntrance);
+											state.currentStack = stack;
+											executor->bindArgument(kthreadEntrance, 0, state, arguments[3]);
+											state.currentStack = (*bit)->stack[state.currentThread->threadId];
 										}
+
 									} else if (f->getName().str() == "malloc" || f->getName().str() == "_ZdaPv"
 											|| f->getName().str() == "_Znaj" || f->getName().str() == "_Znam"
 											|| f->getName().str() == "valloc") {
 										ref<Expr> size = arguments[0];
-										bool isLocal = true;
+										bool isLocal = false;
 										size = executor->toUnique(state, size);
 										if (dyn_cast<ConstantExpr>(size)) {
 											ref<Expr> addr = state.currentThread->stack->realStack.back().locals[ki->dest].value;
@@ -450,14 +445,17 @@ namespace klee {
 										}
 									} else if (f->getName().str() == "calloc") {
 										ref<Expr> size = MulExpr::create(arguments[0], arguments[1]);
-										bool isLocal = true;
+										bool isLocal = false;
 										size = executor->toUnique(state, size);
 										if (dyn_cast<ConstantExpr>(size)) {
 											ref<Expr> addr = state.currentThread->stack->realStack.back().locals[ki->dest].value;
+//											std::cerr << "calloc address : ";
+//											addr->dump();
 											ObjectPair op;
 											bool success = executor->getMemoryObject(op, state, state.currentThread->addressSpace, addr);
 											if (success) {
 												const MemoryObject *mo = op.first;
+//												std::cerr << "calloc address ; " << mo->address << " calloc size : " << mo->size << "\n";
 												ObjectState *os = executor->bindObjectInState(state, mo, isLocal);
 												os->initializeToRandom();
 												executor->bindLocal(ki, state, mo->getBaseExpr());
@@ -488,6 +486,7 @@ namespace klee {
 						assert(0 && "listenerSercive execute call");
 					}
 					arguments.clear();
+					state.currentStack = state.currentThread->stack;
 				}
 				break;
 			}
@@ -505,10 +504,13 @@ namespace klee {
 				size = executor->toUnique(state, size);
 				if (dyn_cast<ConstantExpr>(size)) {
 					ref<Expr> addr = executor->getDestCell(state, ki).value;
+//					std::cerr << "alloc address : ";
+//					addr->dump();
 					ObjectPair op;
 					bool success = executor->getMemoryObject(op, state, state.currentThread->addressSpace, addr);
 					if (success) {
 						const MemoryObject *mo = op.first;
+//						std::cerr << "alloc address ; " << mo->address << " alloc size : " << mo->size << "\n";
 						for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end();
 								bit != bie; ++bit) {
 							state.currentStack = (*bit)->stack[state.currentThread->threadId];

@@ -64,6 +64,10 @@ namespace klee {
 
     Node *node;
     ImmutableTree(Node *_node);
+
+  public:
+    void dump() const;
+    void dump(Node *n) const;
   };
 
   /***/
@@ -502,6 +506,7 @@ namespace klee {
         return &n->value;
       }
     }
+//    std::cerr << "n->isTerminator()\n";
     return result ? &result->value : 0;
   }
 
@@ -613,6 +618,20 @@ namespace klee {
         !key_compare()(key,key_of_value()(*it))) // no need to loop, no duplicates
       ++it;
     return it;
+  }
+
+  template<class K, class V, class KOV, class CMP>
+  void ImmutableTree<K,V,KOV,CMP>::dump() const {
+		  dump(node);
+  }
+
+  template<class K, class V, class KOV, class CMP>
+  void ImmutableTree<K,V,KOV,CMP>::dump(Node *n) const {
+    if(!n->isTerminator()){
+    	dump(n->left);
+    	key_compare()((key_of_value()(n->value)),(key_of_value()(n->value)));
+    	dump(n->right);
+    }
   }
 
 }

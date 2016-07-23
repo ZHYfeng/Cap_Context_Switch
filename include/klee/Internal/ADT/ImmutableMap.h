@@ -97,6 +97,10 @@ namespace klee {
     }
 
     static size_t getAllocated() { return Tree::allocated; }
+
+    void dump() const {
+      elts.dump();
+    }
   };
 
 }

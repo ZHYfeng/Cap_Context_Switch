@@ -890,7 +890,6 @@ const Cell& Executor::eval(KInstruction *ki, unsigned index, ExecutionState &sta
 	} else {
 		unsigned index = vnumber;
 		StackFrame &sf = state.currentStack->realStack.back();
-		std::cerr << "eval index : " << index << std::endl;
 		return sf.locals[index];
 	}
 }
@@ -907,7 +906,6 @@ const Cell& Executor::evalCurrent(KInstruction *ki, unsigned index, ExecutionSta
 	} else {
 		unsigned index = vnumber;
 		StackFrame &sf = state.currentThread->stack->realStack.back();
-		std::cerr << "evalCurrent index : " << index << std::endl;
 		return sf.locals[index];
 	}
 }
@@ -925,14 +923,11 @@ void Executor::ineval(KInstruction *ki, unsigned index, ExecutionState &state, r
 	} else {
 		unsigned index = vnumber;
 		StackFrame &sf = state.currentStack->realStack.back();
-		std::cerr << "ineval index : " << index << std::endl;
 		sf.locals[index].value = value;
 	}
 }
 
 void Executor::bindLocal(KInstruction *target, ExecutionState &state, ref<Expr> value) {
-	std::cerr << "value address : " << value.get() <<std::endl;
-	std::cerr << "getDestCell address : " << getDestCell(state, target).value.get() <<std::endl;
 	getDestCell(state, target).value = value;
 }
 
@@ -1294,7 +1289,6 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
-	std::cerr << "executeInstruction : " << std::endl;
 	Instruction *i = ki->inst;
 	switch (i->getOpcode()) {
 		// Control flow
@@ -1831,7 +1825,12 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 		}
 		case Instruction::Store: {
 			ref<Expr> base = eval(ki, 1, state).value;
+//			std::cerr << "base : ";
+//			base->dump();
 			ref<Expr> value = eval(ki, 0, state).value;
+//			std::cerr << "value : ";
+//			value->dump();
+//			std::cerr << "Instruction::Store:\n";
 			executeMemoryOperation(state, true, base, value, 0);
 			break;
 		}
@@ -1839,15 +1838,19 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 		case Instruction::GetElementPtr: {
 			KGEPInstruction *kgepi = static_cast<KGEPInstruction*>(ki);
 			ref<Expr> base = eval(ki, 0, state).value;
-
+//			std::cerr << "kgepi->base : ";
+//			base->dump();
 			for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie;
 					++it) {
 				uint64_t elementSize = it->second;
 				ref<Expr> index = eval(ki, it->first, state).value;
+//				std::cerr << "kgepi->index : ";
+//				index->dump();
 				base = AddExpr::create(base, MulExpr::create(Expr::createSExtToPointerWidth(index), Expr::createPointer(elementSize)));
 			}
-			if (kgepi->offset)
+			if (kgepi->offset){
 				base = AddExpr::create(base, Expr::createPointer(kgepi->offset));
+			}
 			bindLocal(ki, state, base);
 			break;
 		}
@@ -3041,6 +3044,7 @@ void Executor::executeAlloc(ExecutionState &state, ref<Expr> size, bool isLocal,
 		if (!mo) {
 			bindLocal(target, state, ConstantExpr::alloc(0, Context::get().getPointerWidth()));
 		} else {
+//			std::cerr << "alloc address ; " << mo->address << " size : " << CE->getZExtValue() << "\n";
 			ObjectState *os = bindObjectInState(state, mo, isLocal);
 			if (zeroMemory) {
 				os->initializeToZero();
@@ -3785,7 +3789,10 @@ unsigned Executor::executePThreadCreate(ExecutionState &state, KInstruction *ki,
 		}
 		newThread->vectorClock[newThread->threadId]++;
 
+		state.currentStack = newThread->stack;
 		bindArgument(kthreadEntrance, 0, state, arguments[3]);
+		state.currentStack = thread->stack;
+
 		if (statsTracker)
 			statsTracker->framePushed(state, 0);
 //		PTree* ptree = new PTree(newThread);
@@ -4109,6 +4116,7 @@ void Executor::createSpecialElement(ExecutionState& state, Type* type, uint64_t&
 
 		case Type::StructTyID: {
 			std::string errorMsg;
+//			std::cerr << "StructName : " << type->getStructName().str() << "\n";
 			//下列代码只是为了处理三种特殊结构体的内存对齐，对于复杂对象，其第一个元素在被访问时会计算内存对齐，因此不需要额外对复杂对象计算
 			//内存对齐，这里计算结构体的内存对齐只是因为mutex，cond，barrier三种类型不会被解析，因此需要提前计算。
 			DataLayout* layout = kmodule->targetData;
@@ -4121,6 +4129,7 @@ void Executor::createSpecialElement(ExecutionState& state, Type* type, uint64_t&
 				if (type->getStructName() == "union.pthread_mutex_t") {
 					std::string mutexName = Transfer::uint64toString(startAddress);
 					state.mutexManager.addMutex(mutexName, errorMsg);
+//					std::cerr << "mutexName : " << mutexName << "\n";
 					startAddress += kmodule->targetData->getTypeSizeInBits(type) / 8;
 				} else if (type->getStructName() == "union.pthread_cond_t") {
 					std::string condName = Transfer::uint64toString(startAddress);
