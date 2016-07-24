@@ -412,15 +412,24 @@ namespace klee {
 			case Instruction::Store: {
 				ref<Expr> value = executor->eval(ki, 0, state).value;
 				item->instParameter.push_back(value);
-				ref<Expr> address = executor->eval(ki, 1, state).value;
-				ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address.get());
-				if (realAddress) {
-					uint64_t key = realAddress->getZExtValue();
+				ConstantExpr* realValue = dyn_cast<ConstantExpr>(value.get());
+				if(realValue){
 					Type* valueTy = ki->inst->getOperand(0)->getType();
 					if (valueTy->isPointerTy()) {
+//						std::cerr << "valueTy->isPointerTy()\n";
+						uint64_t startAddress = realValue->getZExtValue();
 						valueTy = valueTy->getPointerElementType();
-						executor->createSpecialElement(state, valueTy, key, false);
+						executor->createSpecialElement(state, valueTy, startAddress, false);
 					}
+				}
+//				std::cerr << "PSO Store\n";
+				ref<Expr> address = executor->eval(ki, 1, state).value;
+				ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address.get());
+//				std::cerr << "address : ";
+//				address->dump();
+				if (realAddress) {
+					uint64_t key = realAddress->getZExtValue();
+//					std::cerr << "key : " << key << std::endl;
 					ObjectPair op;
 					bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 					if (success) {

@@ -1893,6 +1893,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 		case Instruction::BitCast: {
 			ref<Expr> result = eval(ki, 0, state).value;
 			bindLocal(ki, state, result);
+//			std::cerr << "BitCast : ";
+//			result->dump();
 			break;
 		}
 
@@ -4071,6 +4073,7 @@ void Executor::handleInitializers(ExecutionState& initialState) {
 void Executor::createSpecialElement(ExecutionState& state, Type* type, uint64_t& startAddress, bool isInitializer) {
 
 //	std::cerr << "type : " << type->getTypeID() << std::endl;
+//	std::cerr << "startAddress : " << startAddress << std::endl;
 
 	switch (type->getTypeID()) {
 

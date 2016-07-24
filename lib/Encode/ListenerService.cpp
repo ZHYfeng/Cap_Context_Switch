@@ -579,8 +579,8 @@ namespace klee {
 		pushListener(PSOlistener);
 		BitcodeListener* Symboliclistener = new SymbolicListener(executor, &rdManager);
 		pushListener(Symboliclistener);
-		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
-		pushListener(Taintlistener);
+//		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
+//		pushListener(Taintlistener);
 
 		gettimeofday(&start, NULL);
 
@@ -602,20 +602,20 @@ namespace klee {
 		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
 		rdManager.solvingCost += cost;
 
-		gettimeofday(&start, NULL);
-		dtam = new DTAM(&rdManager);
-		dtam->dtam();
-		gettimeofday(&finish, NULL);
-		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-		rdManager.DTAMCost += cost;
-		rdManager.allDTAMCost.push_back(cost);
-
-		gettimeofday(&start, NULL);
-		encode->PTS();
-		gettimeofday(&finish, NULL);
-		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-		rdManager.PTSCost += cost;
-		rdManager.allPTSCost.push_back(cost);
+//		gettimeofday(&start, NULL);
+//		dtam = new DTAM(&rdManager);
+//		dtam->dtam();
+//		gettimeofday(&finish, NULL);
+//		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+//		rdManager.DTAMCost += cost;
+//		rdManager.allDTAMCost.push_back(cost);
+//
+//		gettimeofday(&start, NULL);
+//		encode->PTS();
+//		gettimeofday(&finish, NULL);
+//		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+//		rdManager.PTSCost += cost;
+//		rdManager.allPTSCost.push_back(cost);
 
 		executor->getNewPrefix();
 
