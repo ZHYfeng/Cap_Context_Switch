@@ -378,6 +378,7 @@ Thread* ExecutionState::getNextThread() {
 		nextThread = NULL;
 	}
 	currentThread = nextThread;
+	currentStack = currentThread->stack;
 	return nextThread;
 }
 

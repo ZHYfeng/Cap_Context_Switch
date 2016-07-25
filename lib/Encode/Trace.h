@@ -56,7 +56,6 @@ namespace klee {
 			TraceType traceType; //the type of trace
 
 			//by hy 2015.7.21
-			std::map<std::string, ref<Expr> > symbolicMap;
 			std::vector<ref<klee::Expr> > storeSymbolicExpr;
 			std::vector<ref<klee::Expr> > taintExpr;
 			std::vector<ref<klee::Expr> > rwSymbolicExpr;

@@ -53,7 +53,6 @@ namespace klee {
 
 			//add by hy
 			ref<Expr> manualMakeSymbolic(ExecutionState& state, std::string name, unsigned size, bool isFloat);
-			void storeZeroToExpr(ExecutionState& state, ref<Expr> address, Expr::Width type);
 			ref<Expr> readExpr(ExecutionState &state, ref<Expr> address, Expr::Width size);
 
 	};

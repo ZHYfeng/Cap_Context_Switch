@@ -33,13 +33,10 @@
 using namespace std;
 using namespace llvm;
 
-#define EVENTS_DEBUG 0
+#define EVENTS_DEBUG 1
 #define PTR 1
-#define DEBUGSTRCPY 0
-#define DEBUGSYMBOLIC 0
-#define COND_DEBUG 0
+#define DEBUGSYMBOLIC 1
 #define BIT_WIDTH 64
-#define POINT_BIT_WIDTH 64
 
 namespace klee {
 
@@ -57,7 +54,8 @@ namespace klee {
 	void SymbolicListener::beforeRunMethodAsMain(ExecutionState &initialState) {
 
 		//收集assert
-		for (std::vector<KFunction*>::iterator i = executor->kmodule->functions.begin(), e = executor->kmodule->functions.end(); i != e; ++i) {
+		for (std::vector<KFunction*>::iterator i = executor->kmodule->functions.begin(), e = executor->kmodule->functions.end(); i != e;
+				++i) {
 			KInstruction **instructions = (*i)->instructions;
 			for (unsigned j = 0; j < (*i)->numInstructions; j++) {
 				KInstruction *ki = instructions[j];
@@ -71,8 +69,8 @@ namespace klee {
 						string fileName = ki->info->file;
 						unsigned line = ki->info->line;
 						assertMap[fileName].push_back(line);
-//					printf("fileName : %s, line : %d\n",fileName.c_str(),line);
-//					std::cerr << "call name : " << f->getName().str() << "\n";
+//						printf("fileName : %s, line : %d\n",fileName.c_str(),line);
+//						std::cerr << "call name : " << f->getName().str() << "\n";
 					}
 				}
 			}
@@ -152,13 +150,17 @@ namespace klee {
 							}
 							ref<Expr> constraint = EqExpr::create(value1, value2);
 							if (isAssert) {
-//						cerr << "event name : " << currentEvent->eventName << "\n";
-//						cerr << "assert constraint : " << constraint << "\n";
+#if DEBUGSYMBOLIC
+								errs() << "event name : " << currentEvent->eventName << "\n";
+								errs() << "assert constraint : " << constraint << "\n";
+#endif
 								trace->assertSymbolicExpr.push_back(constraint);
 								trace->assertEvent.push_back(currentEvent);
 							} else if (kleeBr == false) {
-//						cerr << "event name : " << currentEvent->eventName << "\n";
-//						cerr << "br constraint : " << constraint << "\n";
+#if DEBUGSYMBOLIC
+								errs() << "event name : " << currentEvent->eventName << "\n";
+								errs() << "br constraint : " << constraint << "\n";
+#endif
 								trace->brSymbolicExpr.push_back(constraint);
 								trace->brEvent.push_back(currentEvent);
 							}
@@ -227,7 +229,8 @@ namespace klee {
 						executor->ineval(ki, 0, state, value);
 					}
 //					std::cerr << "kgepi->base : " << base << std::endl;
-					for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie; ++it) {
+					for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end();
+							it != ie; ++it) {
 						ref<Expr> index = executor->eval(ki, it->first, state).value;
 //					std::cerr << "kgepi->index : " << index << std::endl;
 //					std::cerr << "first : " << *first << std::endl;
@@ -283,7 +286,7 @@ namespace klee {
 #if PTR
 						if (isFloat || id == Type::IntegerTyID || id == Type::PointerTyID) {
 #else
-						if (isFloat || id == Type::IntegerTyID) {
+							if (isFloat || id == Type::IntegerTyID) {
 #endif
 							Expr::Width size = executor->getWidthForLLVMType(ki->inst->getType());
 							ref<Expr> value = executor->getDestCell(state, ki).value;
@@ -374,7 +377,7 @@ namespace klee {
 		cerr << "######################本条路径为新路径####################\n";
 #if EVENTS_DEBUG
 		//true: output to file; false: output to terminal
-		runtimeData.printCurrentTrace(true);
+		rdManager->printCurrentTrace(true);
 		//			encode.showInitTrace();//need to be modified
 #endif
 	}
@@ -402,22 +405,6 @@ namespace klee {
 		result->dump();
 #endif
 		return result;
-	}
-
-	ref<Expr> SymbolicListener::readExpr(ExecutionState &state, ref<Expr> address, Expr::Width size) {
-		ObjectPair op;
-		executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
-		const MemoryObject *mo = op.first;
-		ref<Expr> offset = mo->getOffsetExpr(address);
-		const ObjectState *os = op.second;
-		ref<Expr> result = os->read(offset, size);
-		return result;
-	}
-
-	void SymbolicListener::storeZeroToExpr(ExecutionState& state, ref<Expr> address, Expr::Width size) {
-
-		ref<Expr> value = ConstantExpr::create(0, size);
-		executor->executeMemoryOperation(state, true, address, value, 0);
 	}
 
 }

@@ -31,8 +31,6 @@
 using namespace std;
 using namespace llvm;
 
-#define EVENTS_DEBUG 0
-
 #define PTR 0
 #define DEBUGSTRCPY 0
 #define COND_DEBUG 0
@@ -40,7 +38,7 @@ using namespace llvm;
 namespace klee {
 
 	PSOListener::PSOListener(Executor* executor, RuntimeDataManager* rdManager) :
-			BitcodeListener(rdManager), executor(executor), lastEvent(NULL) {
+			BitcodeListener(rdManager), executor(executor), currentEvent(NULL) {
 		// TODO Auto-generated constructor stub
 		kind = PSOListenerKind;
 	}
@@ -101,6 +99,7 @@ namespace klee {
 		} else {
 			item = trace->createEvent(thread->threadId, ki, Event::IGNORE);
 		}
+		errs() << "event name : " << item->eventName << "\n";
 
 		vector<Event*> frontVirtualEvents, backVirtualEvents; // the virtual event which should be inserted before/behind item
 		frontVirtualEvents.reserve(10);
@@ -113,7 +112,7 @@ namespace klee {
 				Function *f = executor->getTargetFunction(fp, state);
 				if (!f) {
 					ref<Expr> expr = executor->eval(ki, 0, state).value;
-					ConstantExpr* constExpr = dyn_cast<ConstantExpr>(expr.get());
+					ConstantExpr* constExpr = dyn_cast<ConstantExpr>(expr);
 					uint64_t functionPtr = constExpr->getZExtValue();
 					f = (Function*) functionPtr;
 				}
@@ -142,7 +141,7 @@ namespace klee {
 					if (success) {
 //				const ObjectState* pthreados = pthreadop.second;
 						const MemoryObject* pthreadmo = pthreadop.first;
-						ConstantExpr* realAddress = dyn_cast<ConstantExpr>(pthreadAddress.get());
+						ConstantExpr* realAddress = dyn_cast<ConstantExpr>(pthreadAddress);
 						uint64_t key = realAddress->getZExtValue();
 						if (executor->isGlobalMO(pthreadmo)) {
 							item->isGlobal = true;
@@ -156,7 +155,6 @@ namespace klee {
 						item->globalName = varFullName;
 						item->name = varName;
 					}
-					trace->insertThreadCreateOrJoin(make_pair(lastEvent, thread->threadId), true);
 				} else if (f->getName().str() == "pthread_join") {
 					CallInst* calli = dyn_cast<CallInst>(inst);
 					IntegerType* paramType = (IntegerType*) (calli->getArgOperand(0)->getType());
@@ -164,6 +162,9 @@ namespace klee {
 					ConstantExpr* joinedThreadIdExpr = dyn_cast<ConstantExpr>(param);
 					uint64_t joinedThreadId = joinedThreadIdExpr->getZExtValue(paramType->getBitWidth());
 					trace->insertThreadCreateOrJoin(make_pair(item, joinedThreadId), false);
+					llvm::errs() << "event name : " << item->eventName << " joinedThreadId : " << param << "\n";
+					ref<Expr> pparam = executor->evalCurrent(ki, 1, state).value;
+					llvm::errs() << "event name : " << item->eventName << " joinedThreadId : " << pparam << "\n";
 				} else if (f->getName().str() == "pthread_cond_wait") {
 					ref<Expr> param;
 					ObjectPair op;
@@ -295,7 +296,7 @@ namespace klee {
 					barrierInfo->count = countExpr->getZExtValue();
 				} else if (f->getName() == "make_taint") {
 					ref<Expr> address = executor->eval(ki, 1, state).value;
-					ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address.get());
+					ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address);
 					if (realAddress) {
 						uint64_t key = realAddress->getZExtValue();
 						ObjectPair op;
@@ -369,7 +370,7 @@ namespace klee {
 					item->eventType = Event::IGNORE;
 				} else {
 					ref<Expr> address = executor->eval(ki, 0, state).value;
-					ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address.get());
+					ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address);
 					if (realAddress) {
 						uint64_t key = realAddress->getZExtValue();
 						ObjectPair op;
@@ -412,8 +413,8 @@ namespace klee {
 			case Instruction::Store: {
 				ref<Expr> value = executor->eval(ki, 0, state).value;
 				item->instParameter.push_back(value);
-				ConstantExpr* realValue = dyn_cast<ConstantExpr>(value.get());
-				if(realValue){
+				ConstantExpr* realValue = dyn_cast<ConstantExpr>(value);
+				if (realValue) {
 					Type* valueTy = ki->inst->getOperand(0)->getType();
 					if (valueTy->isPointerTy()) {
 //						std::cerr << "valueTy->isPointerTy()\n";
@@ -424,7 +425,7 @@ namespace klee {
 				}
 //				std::cerr << "PSO Store\n";
 				ref<Expr> address = executor->eval(ki, 1, state).value;
-				ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address.get());
+				ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address);
 //				std::cerr << "address : ";
 //				address->dump();
 				if (realAddress) {
@@ -482,12 +483,49 @@ namespace klee {
 			trace->insertEvent(*ei, thread->threadId);
 		}
 		trace->insertPath(item);
-		lastEvent = item;
+		currentEvent = item;
 	}
 
 //指令调用消息响应函数，在指令解释执行之后调用
 	void PSOListener::afterExecuteInstruction(ExecutionState &state, KInstruction *ki) {
+		Trace* trace = rdManager->getCurrentTrace();
+		Instruction* inst = ki->inst;
 
+		switch (inst->getOpcode()) {
+			case Instruction::Call: {
+//		inst->dump();
+				CallSite cs(inst);
+				Value *fp = cs.getCalledValue();
+				Function *f = executor->getTargetFunction(fp, state);
+				if (!f) {
+					ref<Expr> expr = executor->eval(ki, 0, state).value;
+					ConstantExpr* constExpr = dyn_cast<ConstantExpr>(expr);
+					uint64_t functionPtr = constExpr->getZExtValue();
+					f = (Function*) functionPtr;
+				}
+
+//		std::cerr<<"call name : "<< f->getName().str().c_str() <<"\n";
+				if (f->getName().str() == "pthread_create") {
+					ref<Expr> pthreadAddress = executor->eval(ki, 1, state).value;
+					Expr::Width type = executor->getWidthForLLVMType(inst->getType());
+					ref<Expr> pid = executor->readExpr(state, state.currentThread->stack->addressSpace, pthreadAddress, type);
+					ConstantExpr* pidConstant = dyn_cast<ConstantExpr>(pid);
+					uint64_t pidInt = pidConstant->getZExtValue();
+					trace->insertThreadCreateOrJoin(make_pair(currentEvent, pidInt), true);
+					llvm::errs() << "PSO pthread_create event name : " << currentEvent->eventName << " pid : " << pid << "\n";
+				}
+				break;
+			}
+			case Instruction::Load: {
+				ref<Expr> value = executor->getDestCell(state, ki).value;
+				llvm::errs() << "PSO load : " << value << "\n";
+				break;
+			}
+
+			default: {
+				break;
+			}
+		}
 	}
 
 //消息响应函数，在被测程序解释执行之后调用
@@ -680,7 +718,7 @@ namespace klee {
 
 //向全局变量表插入全局变量
 	void PSOListener::insertGlobalVariable(ref<Expr> address, Type* type) {
-		ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address.get());
+		ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address);
 		uint64_t key = realAddress->getZExtValue();
 		map<uint64_t, Type*>::iterator mi = usedGlobalVariableRecord.find(key);
 		if (mi == usedGlobalVariableRecord.end()) {
@@ -691,7 +729,7 @@ namespace klee {
 //获取外部函数的返回值,必须在Call指令解释执行之后调用
 	Constant * PSOListener::handleFunctionReturnValue(ExecutionState & state, KInstruction * ki) {
 		Instruction* inst = ki->inst;
-		Function *f = lastEvent->calledFunction;
+		Function *f = currentEvent->calledFunction;
 		Type* returnType = inst->getType();
 		Constant* result = NULL;
 		if (!f->getName().startswith("klee") && !executor->kmodule->functionMap[f] && !returnType->isVoidTy()) {
@@ -705,7 +743,7 @@ namespace klee {
 	void PSOListener::handleExternalFunction(ExecutionState& state, KInstruction *ki) {
 //	Trace* trace = rdManager->getCurrentTrace();
 		Instruction* inst = ki->inst;
-		Function *f = lastEvent->calledFunction;
+		Function *f = currentEvent->calledFunction;
 		if (f->getName() == "strcpy") {
 
 //		ref<Expr> scrAddress = executor->eval(ki, 2, state.currentstack[thread->threadId]).value;
@@ -750,17 +788,17 @@ namespace klee {
 			uint64_t destaddress = caddress->getZExtValue();
 			for (unsigned i = 0; i < destmo->size - destaddress + destmo->address; i++) {
 				ref<Expr> ch = destos->read(i, 8);
-				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(ch.get());
+				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(ch);
 				string name = createVarName(destmo->id, destaddress + i, executor->isGlobalMO(destmo));
 				if (executor->isGlobalMO(destmo)) {
 					unsigned storeTime = getStoreTime(destaddress + i);
 
 					name = createGlobalVarFullName(name, storeTime, true);
 
-					lastEvent->isGlobal = true;
+					currentEvent->isGlobal = true;
 				}
 #if DEBUGSTRCPY
-				cerr << "Event name : " << lastEvent->eventName << "\n";
+				cerr << "Event name : " << currentEvent->eventName << "\n";
 				cerr<<"name : "<<name<<std::endl;
 #endif
 				//cerr << "address = " << name << "value = " << ((ConstantInt*)constant)->getSExtValue() << endl;

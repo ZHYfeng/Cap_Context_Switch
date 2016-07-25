@@ -53,7 +53,7 @@ namespace klee {
 		private:
 
 			Executor* executor;
-			Event* lastEvent;
+			Event* currentEvent;
 
 			std::stringstream ss;
 			std::map<uint64_t, unsigned> loadRecord;
@@ -100,6 +100,7 @@ namespace klee {
 				ss << memoryId;
 				ss << '_';
 				ss << address;
+//				llvm::errs() << "create var name : " << ss.str() << "\n";
 				return ss.str();
 			}
 

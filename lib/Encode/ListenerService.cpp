@@ -160,8 +160,8 @@ namespace klee {
 
 	void ListenerService::beforeExecuteInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
 
-//		std::cerr << "thread id : " << state.currentThread->threadId << "  ";
-//		ki->inst->dump();
+		std::cerr << "thread id : " << state.currentThread->threadId << "  ";
+		ki->inst->dump();
 		//		std::cerr << " before : " << std::endl;
 
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
@@ -200,8 +200,7 @@ namespace klee {
 								Expr::Width from = result->getWidth();
 								Expr::Width to = executor->getWidthForLLVMType(t);
 								if (from != to) {
-									CallSite cs = (
-											isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
+									CallSite cs = (isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
 									bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
 									if (isSExt) {
 										result = SExtExpr::create(result, to);
@@ -358,7 +357,6 @@ namespace klee {
 				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie;
 						++bit) {
 					state.currentStack = (*bit)->stack[state.currentThread->threadId];
-
 					CallSite cs(i);
 					Value *fp = cs.getCalledValue();
 					Function *f = executor->getTargetFunction(fp, state);
@@ -377,7 +375,9 @@ namespace klee {
 											threadEntrance = (Function*) (functionPtr->getZExtValue());
 										}
 										KFunction *kthreadEntrance = executor->kmodule->functionMap[threadEntrance];
-										Expr::Width type = executor->getWidthForLLVMType(ki->inst->getType());
+										PointerType* pointerType = (PointerType*) (calli->getArgOperand(0)->getType());
+										IntegerType* elementType = (IntegerType*) (pointerType->getElementType());
+										Expr::Width type = elementType->getBitWidth();
 										ref<Expr> address = arguments[0];
 										ObjectPair op;
 										bool success = executor->getMemoryObject(op, state, state.currentThread->addressSpace, address);
@@ -386,6 +386,7 @@ namespace klee {
 											ref<Expr> offset = mo->getOffsetExpr(address);
 											const ObjectState *os = op.second;
 											ref<Expr> threadID = os->read(offset, type);
+											llvm::errs() << "thread id : " << threadID << "\n";
 											executor->executeMemoryOperation(state, true, address, threadID, 0);
 											executor->bindLocal(ki, state, ConstantExpr::create(0, Expr::Int32));
 

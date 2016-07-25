@@ -278,6 +278,7 @@ namespace klee {
 			// and perform the operation
 			void executeMemoryOperation(ExecutionState &state, bool isWrite, ref<Expr> address, ref<Expr> value /* undef if read */,
 					KInstruction *target /* undef if write */);
+			ref<Expr> readExpr(ExecutionState& state, AddressSpace *addressSpace, ref<Expr> address, Expr::Width size);
 
 			void executeMakeSymbolic(ExecutionState &state, const MemoryObject *mo, const std::string &name);
 

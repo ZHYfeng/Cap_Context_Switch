@@ -826,7 +826,7 @@ ref<klee::ConstantExpr> Executor::evalConstant(const Constant *c) {
 			return ConstantExpr::alloc(ci->getValue());
 		} else if (const ConstantFP *cf = dyn_cast<ConstantFP>(c)) {
 			ref<Expr> result = ConstantExpr::alloc(cf->getValueAPF().bitcastToAPInt());
-			result.get()->isFloat = true;
+			result->isFloat = true;
 			return cast<ConstantExpr>(result);
 		} else if (const GlobalValue *gv = dyn_cast<GlobalValue>(c)) {
 			return globalAddresses.find(gv)->second;
@@ -1296,6 +1296,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 			ReturnInst *ri = cast<ReturnInst>(i);
 			KInstIterator kcaller = state.currentStack->realStack.back().caller;
 			Instruction *caller = kcaller ? kcaller->inst : 0;
+			llvm::errs() << "caller : " << caller << "\n";
 			bool isVoidReturn = (ri->getNumOperands() == 0);
 			ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
 
@@ -1305,7 +1306,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
 			if (state.currentStack->realStack.size() <= 1) {
 				assert(!caller && "caller set on initial stack frame");
-				terminateStateOnExit(state);
+				errs() << "state.currentStack->realStack.size() <= 1\n";
+				//recover join thread
+				std::map<unsigned, std::vector<unsigned> >::iterator ji = state.joinRecord.find(state.currentThread->threadId);
+				if (ji != state.joinRecord.end()) {
+					for (std::vector<unsigned>::iterator bi = ji->second.begin(), be = ji->second.end(); bi != be; bi++) {
+						state.swapInThread(*bi, true, false);
+					}
+				}
+				state.swapOutThread(state.currentThread, false, false, false, true);
+//				terminateStateOnExit(state);
 			} else {
 				state.currentStack->popFrame();
 
@@ -1820,6 +1830,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
 		case Instruction::Load: {
 			ref<Expr> base = eval(ki, 0, state).value;
+			llvm::errs() << "base : " << base << "\n";
 			executeMemoryOperation(state, false, base, 0, ki);
 			break;
 		}
@@ -1920,11 +1931,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				Res.add(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
 #endif
 				ref<Expr> result = ConstantExpr::alloc(Res.bitcastToAPInt());
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 			} else {
 				ref<Expr> res = AddExpr::create(originLeft, originRight);
-				res.get()->isFloat = true;
+				res->isFloat = true;
 				bindLocal(ki, state, res);
 			}
 			break;
@@ -1949,13 +1960,13 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				Res.subtract(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
 #endif
 				ref<Expr> result = ConstantExpr::alloc(Res.bitcastToAPInt());
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 			} else {
-				originLeft.get()->isFloat = true;
-				originRight.get()->isFloat = true;
+				originLeft->isFloat = true;
+				originRight->isFloat = true;
 				ref<Expr> res = SubExpr::create(originLeft, originRight);
-				res.get()->isFloat = true;
+				res->isFloat = true;
 				bindLocal(ki, state, res);
 			}
 			break;
@@ -1981,16 +1992,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				Res.multiply(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
 #endif
 				ref<Expr> result = ConstantExpr::alloc(Res.bitcastToAPInt());
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 //    bindLocal(ki, state.currentStack, ConstantExpr::alloc(Res.bitcastToAPInt()));
 			} else {
-				originLeft.get()->isFloat = true;
-				originRight.get()->isFloat = true;
+				originLeft->isFloat = true;
+				originRight->isFloat = true;
 //			cerr << "MulExpr : "<< originLeft << " * "<< originRight << "\n";
 				ref<Expr> res = MulExpr::create(originLeft, originRight);
 //			cerr << "MulExpr : "<< res << "\n";
-				res.get()->isFloat = true;
+				res->isFloat = true;
 				bindLocal(ki, state, res);
 			}
 			break;
@@ -2016,14 +2027,14 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				Res.divide(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
 #endif
 				ref<Expr> result = ConstantExpr::alloc(Res.bitcastToAPInt());
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 //    bindLocal(ki, state.currentStack, ConstantExpr::alloc(Res.bitcastToAPInt()));
 			} else {
-				originLeft.get()->isFloat = true;
-				originRight.get()->isFloat = true;
+				originLeft->isFloat = true;
+				originRight->isFloat = true;
 				ref<Expr> result = SDivExpr::create(originLeft, originRight);
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 			}
 			break;
@@ -2048,12 +2059,12 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				Res.mod(APFloat(right->getAPValue()), APFloat::rmNearestTiesToEven);
 #endif
 				ref<Expr> result = ConstantExpr::alloc(Res.bitcastToAPInt());
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 //    bindLocal(ki, state.currentStack, ConstantExpr::alloc(Res.bitcastToAPInt()));
 			} else {
 				ref<Expr> result = SRemExpr::create(originLeft, originRight);
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 			}
 			break;
@@ -2079,12 +2090,12 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				bool losesInfo = false;
 				Res.convert(*fpWidthToSemantics(resultType), llvm::APFloat::rmNearestTiesToEven, &losesInfo);
 				ref<Expr> result = ConstantExpr::alloc(Res);
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 //    bindLocal(ki, state.currentStack, ConstantExpr::alloc(Res));
 			} else {
 				ref<Expr> result = ExtractExpr::create(eval(ki, 0, state).value, 0, getWidthForLLVMType(fi->getType()));
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 			}
 			break;
@@ -2108,11 +2119,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				bool losesInfo = false;
 				Res.convert(*fpWidthToSemantics(resultType), llvm::APFloat::rmNearestTiesToEven, &losesInfo);
 				ref<Expr> result = ConstantExpr::alloc(Res);
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 			} else {
 				ref<Expr> result = SExtExpr::create(eval(ki, 0, state).value, getWidthForLLVMType(fi->getType()));
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 			}
 			break;
@@ -2140,7 +2151,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				bindLocal(ki, state, ConstantExpr::alloc(value, resultType));
 			} else {
 				ref<Expr> result = ExtractExpr::alloc(eval(ki, 0, state).value, 0, getWidthForLLVMType(fi->getType()));
-				result.get()->isFloat = false;
+				result->isFloat = false;
 				bindLocal(ki, state, result);
 			}
 			break;
@@ -2169,10 +2180,10 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				bindLocal(ki, state, ConstantExpr::alloc(value, resultType));
 			} else {
 				ref<Expr> result = ExtractExpr::alloc(eval(ki, 0, state).value, 0, getWidthForLLVMType(fi->getType()));
-				result.get()->isFloat = false;
+				result->isFloat = false;
 //			std::cerr << "fptosi in exe ";
-//			std::cerr << result.get()->getKind() << "\n";
-//			result.get()->dump();
+//			std::cerr << result->getKind() << "\n";
+//			result->dump();
 				bindLocal(ki, state, result);
 			}
 			break;
@@ -2193,11 +2204,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				f.convertFromAPInt(arg->getAPValue(), false, llvm::APFloat::rmNearestTiesToEven);
 
 				ref<Expr> result = ConstantExpr::alloc(f);
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 			} else {
 				ref<Expr> result = SExtExpr::alloc(eval(ki, 0, state).value, getWidthForLLVMType(fi->getType()));
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 			}
 			break;
@@ -2219,11 +2230,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				f.convertFromAPInt(arg->getAPValue(), true, llvm::APFloat::rmNearestTiesToEven);
 
 				ref<Expr> result = ConstantExpr::alloc(f);
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 			} else {
 				ref<Expr> result = SExtExpr::alloc(eval(ki, 0, state).value, getWidthForLLVMType(fi->getType()));
-				result.get()->isFloat = true;
+				result->isFloat = true;
 				bindLocal(ki, state, result);
 			}
 			break;
@@ -3293,6 +3304,17 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite, ref<E
 	}
 }
 
+
+ref<Expr> Executor::readExpr(ExecutionState& state, AddressSpace *addressSpace, ref<Expr> address, Expr::Width size) {
+	ObjectPair op;
+	getMemoryObject(op, state, addressSpace, address);
+	const MemoryObject *mo = op.first;
+	ref<Expr> offset = mo->getOffsetExpr(address);
+	const ObjectState *os = op.second;
+	ref<Expr> result = os->read(offset, size);
+	return result;
+}
+
 void Executor::executeMakeSymbolic(ExecutionState &state, const MemoryObject *mo, const std::string &name) {
 	// Create a new object state for the memory object (instead of a copy).
 	if (!replayKTest) {
@@ -3574,7 +3596,7 @@ void Executor::doImpliedValueConcretization(ExecutionState &state, ref<Expr> e, 
 	ImpliedValueList results;
 	ImpliedValue::getImpliedValues(e, value, results);
 	for (ImpliedValueList::iterator it = results.begin(), ie = results.end(); it != ie; ++it) {
-		ReadExpr *re = it->first.get();
+		ref<ReadExpr> re = it->first;
 
 		if (ConstantExpr *CE = dyn_cast<ConstantExpr>(re->index)) {
 			// FIXME: This is the sole remaining usage of the Array object
@@ -3649,7 +3671,10 @@ void Executor::runVerification(llvm::Function *f, int argc, char **argv, char **
 }
 
 void Executor::prepareNextExecution() {
-
+	for (std::set<ExecutionState*>::const_iterator it = states.begin(), ie =
+			states.end(); it != ie; ++it) {
+		delete *it;
+	}
 }
 
 void Executor::getNewPrefix() {
@@ -3695,7 +3720,7 @@ void Executor::printInstrcution(ExecutionState &state, KInstruction* ki) {
 				Function *f = getTargetFunction(fp, state);
 				if (!f) {
 					ref<Expr> expr = eval(ki, 0, state).value;
-					ConstantExpr* constExpr = dyn_cast<ConstantExpr>(expr.get());
+					ConstantExpr* constExpr = dyn_cast<ConstantExpr>(expr);
 					uint64_t functionPtr = constExpr->getZExtValue();
 					f = (Function*) functionPtr;
 				}
@@ -3803,8 +3828,10 @@ unsigned Executor::executePThreadCreate(ExecutionState &state, KInstruction *ki,
 		// set threadId to function's first param
 		PointerType* pointerType = (PointerType*) (calli->getArgOperand(0)->getType());
 		IntegerType* elementType = (IntegerType*) (pointerType->getElementType());
+		Expr::Width type = elementType->getBitWidth();
 		ref<Expr> pidAddress = arguments[0];
-		executeMemoryOperation(state, true, pidAddress, ConstantExpr::create(newThread->threadId, elementType->getBitWidth()), 0);
+		executeMemoryOperation(state, true, pidAddress, ConstantExpr::create(newThread->threadId, type), 0);
+		llvm::errs() << "pidAddress : " << pidAddress << "\n";
 	} else {
 		assert(0 && "inst must be callInst!");
 	}
@@ -3819,7 +3846,8 @@ unsigned Executor::executePThreadCreate(ExecutionState &state, KInstruction *ki,
 unsigned Executor::executePThreadJoin(ExecutionState &state, KInstruction *ki, std::vector<ref<Expr> > &arguments) {
 	CallInst* calli = dyn_cast<CallInst>(ki->inst);
 	if (calli) {
-		ConstantExpr* threadIdExpr = dyn_cast<ConstantExpr>(arguments[0].get());
+		ref<ConstantExpr> threadIdExpr = dyn_cast<ConstantExpr>(arguments[0]);
+		llvm::errs() << " joinedThreadId : " << threadIdExpr << "\n";
 		unsigned threadId = threadIdExpr->getZExtValue();
 		Thread* joinThread = state.findThreadById(threadId);
 		if (joinThread) {
@@ -3848,8 +3876,8 @@ unsigned Executor::executePThreadJoin(ExecutionState &state, KInstruction *ki, s
  * execute pthread_cond_wait
  */
 unsigned Executor::executePThreadCondWait(ExecutionState &state, KInstruction *ki, std::vector<ref<Expr> > &arguments) {
-	ConstantExpr* condAddress = dyn_cast<ConstantExpr>(arguments[0].get());
-	ConstantExpr* mutexAddress = dyn_cast<ConstantExpr>(arguments[1].get());
+	ConstantExpr* condAddress = dyn_cast<ConstantExpr>(arguments[0]);
+	ConstantExpr* mutexAddress = dyn_cast<ConstantExpr>(arguments[1]);
 	if (!mutexAddress) {
 		assert(0 && "mutex address is not const");
 	}
@@ -3873,7 +3901,7 @@ unsigned Executor::executePThreadCondWait(ExecutionState &state, KInstruction *k
  * execute pthread_cond_signal
  */
 unsigned Executor::executePThreadCondSignal(ExecutionState &state, KInstruction *ki, std::vector<ref<Expr> > &arguments) {
-	ConstantExpr* condAddress = dyn_cast<ConstantExpr>(arguments[0].get());
+	ConstantExpr* condAddress = dyn_cast<ConstantExpr>(arguments[0]);
 	if (!condAddress) {
 		assert(0 && "cond address is not const");
 	}
@@ -3907,7 +3935,7 @@ unsigned Executor::executePThreadCondSignal(ExecutionState &state, KInstruction 
  * execute pthread_cond_broadcast
  */
 unsigned Executor::executePThreadCondBroadcast(ExecutionState &state, KInstruction *ki, std::vector<ref<Expr> > &arguments) {
-	ConstantExpr* condAddress = dyn_cast<ConstantExpr>(arguments[0].get());
+	ConstantExpr* condAddress = dyn_cast<ConstantExpr>(arguments[0]);
 	if (!condAddress) {
 		assert(0 && "cond address is not const");
 	}
@@ -3944,7 +3972,7 @@ unsigned Executor::executePThreadCondBroadcast(ExecutionState &state, KInstructi
  */
 unsigned Executor::executePThreadMutexLock(ExecutionState &state, KInstruction *ki, std::vector<ref<Expr> > &arguments) {
 	ref<Expr> address = arguments[0];
-	ConstantExpr* mutexAddress = dyn_cast<ConstantExpr>(address.get());
+	ConstantExpr* mutexAddress = dyn_cast<ConstantExpr>(address);
 	//cerr << " lock param : " << mutexAddress->getZExtValue();
 	if (mutexAddress) {
 		std::string key = Transfer::uint64toString(mutexAddress->getZExtValue());
@@ -3970,7 +3998,7 @@ unsigned Executor::executePThreadMutexLock(ExecutionState &state, KInstruction *
  */
 unsigned Executor::executePThreadMutexUnlock(ExecutionState &state, KInstruction *ki, std::vector<ref<Expr> > &arguments) {
 	ref<Expr> address = arguments[0];
-	ConstantExpr* mutexAddress = dyn_cast<ConstantExpr>(address.get());
+	ConstantExpr* mutexAddress = dyn_cast<ConstantExpr>(address);
 	if (mutexAddress) {
 		std::string key = Transfer::uint64toString(mutexAddress->getZExtValue());
 		std::string errorMsg;
@@ -3989,8 +4017,8 @@ unsigned Executor::executePThreadMutexUnlock(ExecutionState &state, KInstruction
  * execute pthread_barrier_init
  */
 unsigned Executor::executePThreadBarrierInit(ExecutionState &state, KInstruction *ki, std::vector<ref<Expr> > &arguments) {
-	ConstantExpr* barrierAddress = dyn_cast<ConstantExpr>(arguments[0].get());
-	ConstantExpr* count = dyn_cast<ConstantExpr>(arguments[2].get());
+	ConstantExpr* barrierAddress = dyn_cast<ConstantExpr>(arguments[0]);
+	ConstantExpr* count = dyn_cast<ConstantExpr>(arguments[2]);
 	if (!barrierAddress) {
 		assert(0 && "barrier address is not const");
 	}
@@ -4011,7 +4039,7 @@ unsigned Executor::executePThreadBarrierInit(ExecutionState &state, KInstruction
  * execute pthread_barrier_wait
  */
 unsigned Executor::executePThreadBarrierWait(ExecutionState &state, KInstruction *ki, std::vector<ref<Expr> > &arguments) {
-	ConstantExpr* barrierAddress = dyn_cast<ConstantExpr>(arguments[0].get());
+	ConstantExpr* barrierAddress = dyn_cast<ConstantExpr>(arguments[0]);
 	if (!barrierAddress) {
 		assert(0 && "barrier address is not const");
 	}
@@ -4056,7 +4084,7 @@ void Executor::handleInitializers(ExecutionState& initialState) {
 		if (i->hasInitializer() && i->getName().str().at(0) != '.') {
 //			std::cerr << "name : " << i->getName().str() << "\n";
 			Type* type = i->getInitializer()->getType();
-			ConstantExpr* address = globalAddresses.find(i)->second.get();
+			ref<ConstantExpr> address = globalAddresses.find(i)->second;
 			uint64_t startAddress = address->getZExtValue();
 			createSpecialElement(initialState, type, startAddress, true);
 		}

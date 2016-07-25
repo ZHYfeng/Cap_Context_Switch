@@ -41,11 +41,10 @@
 #include "../../include/klee/util/Ref.h"
 #include "Prefix.h"
 
-#define FORMULA_DEBUG 0
+#define FORMULA_DEBUG 1
 #define BRANCH_INFO 1
 #define BUFFERSIZE 300
 #define BIT_WIDTH 64
-#define POINT_BIT_WIDTH 64
 
 #define INT_ARITHMETIC 0
 
@@ -294,28 +293,28 @@ void Encode::check_if() {
 
 			Event* curr = ifFormula[i].first;
 
-			//添加读写的解
-			std::set<std::string> &RelatedSymbolicExpr = trace->RelatedSymbolicExpr;
-			std::vector<ref<klee::Expr> > &rwSymbolicExpr = trace->rwSymbolicExpr;
-			std::string varName;
-			unsigned int totalRwExpr = rwFormula.size();
-			for (unsigned int j = 0; j < totalRwExpr; j++){
-				varName = filter.getName(rwSymbolicExpr[j]->getKid(1));
-				if (RelatedSymbolicExpr.find(varName) == RelatedSymbolicExpr.end()){
-					Event* temp = rwFormula[j].first;
-					expr currIf = z3_ctx.int_const(curr->eventName.c_str());
-					expr tempIf = z3_ctx.int_const(temp->eventName.c_str());
-					expr constraint = z3_ctx.bool_val(1);
-					if (curr->threadId == temp->threadId) {
-						if (curr->eventId > temp->eventId)
-							constraint = rwFormula[j].second;
-					} else {
-						constraint = implies(tempIf < currIf, rwFormula[j].second);
-					}
-					z3_solver.add(constraint);
-//					z3_solver.add(rwFormula[j].second);
-				}
-			}
+//			//添加读写的解
+//			std::set<std::string> &RelatedSymbolicExpr = trace->RelatedSymbolicExpr;
+//			std::vector<ref<klee::Expr> > &rwSymbolicExpr = trace->rwSymbolicExpr;
+//			std::string varName;
+//			unsigned int totalRwExpr = rwFormula.size();
+//			for (unsigned int j = 0; j < totalRwExpr; j++){
+//				varName = filter.getName(rwSymbolicExpr[j]->getKid(1));
+//				if (RelatedSymbolicExpr.find(varName) == RelatedSymbolicExpr.end()){
+//					Event* temp = rwFormula[j].first;
+//					expr currIf = z3_ctx.int_const(curr->eventName.c_str());
+//					expr tempIf = z3_ctx.int_const(temp->eventName.c_str());
+//					expr constraint = z3_ctx.bool_val(1);
+//					if (curr->threadId == temp->threadId) {
+//						if (curr->eventId > temp->eventId)
+//							constraint = rwFormula[j].second;
+//					} else {
+//						constraint = implies(tempIf < currIf, rwFormula[j].second);
+//					}
+//					z3_solver.add(constraint);
+////					z3_solver.add(rwFormula[j].second);
+//				}
+//			}
 
 			z3_solver.add(!ifFormula[i].second);
 			for (unsigned j = 0; j < ifFormula.size(); j++) {
@@ -1000,7 +999,7 @@ void Encode::buildPathCondition(solver z3_solver_pc) {
 void Encode::buildifAndassert() {
 	Trace* trace = runtimeData->getCurrentTrace();
 	filter.filterUseless(trace);
-#if DEBUGSYMBOLIC
+#if FORMULA_DEBUG
 	cerr << "all constraint :" << std::endl;
 	std::cerr << "storeSymbolicExpr = " << trace->storeSymbolicExpr.size()
 	<< std::endl;
@@ -1019,12 +1018,6 @@ void Encode::buildifAndassert() {
 
 	for (std::vector<ref<Expr> >::iterator it = trace->assertSymbolicExpr.begin(),
 			ie = trace->assertSymbolicExpr.end(); it != ie; ++it) {
-		it->get()->dump();
-	}
-	std::cerr << "kQueryExpr = " << trace->kQueryExpr.size()
-	<< std::endl;
-	for (std::vector<ref<Expr> >::iterator it = trace->kQueryExpr.begin(),
-			ie = trace->kQueryExpr.end(); it != ie; ++it) {
 		it->get()->dump();
 	}
 #endif
@@ -1380,8 +1373,7 @@ void Encode::controlGranularity(int level) {
 				InstType currInstType = getInstOpType(curr);
 
 				//debug
-//				curr->inst->inst->print(cerr);
-//				cerr << "\n";
+//				llvm::errs() << "enent name " << curr->eventName << " inst type : ";
 //				if (currInstType == NormalOp)
 //					cerr << "NormalOp!\n";
 //				else if (currInstType == GlobalVarOp)
@@ -1434,6 +1426,9 @@ void Encode::buildPartialOrderFormula(solver z3_solver_po) {
 #if FORMULA_DEBUG
 	cerr << "\nPartialOrderFormula:\n";
 #endif
+#if FORMULA_DEBUG
+	cerr << "\nthread_create:\n";
+#endif
 //handle thread_create
 	std::map<Event*, uint64_t>::iterator itc = trace->createThreadPoint.begin();
 	for (; itc != trace->createThreadPoint.end(); itc++) {
@@ -1451,14 +1446,18 @@ void Encode::buildPartialOrderFormula(solver z3_solver_po) {
 	}
 	//statics
 	formulaNum += trace->createThreadPoint.size();
-
+#if FORMULA_DEBUG
+	cerr << "\nthread_join:\n";
+#endif
 //handle thread_join
 	std::map<Event*, uint64_t>::iterator itj = trace->joinThreadPoint.begin();
 	for (; itj != trace->joinThreadPoint.end(); itj++) {
 		//the event is at the point of joining thread
 		string joinPoint = itj->first->eventName;
+		llvm::errs() << "jionPoint : " << joinPoint << "\n";
 		//the event is the last step of joined thread
 		string lastStep = trace->eventList[itj->second]->back()->eventName;
+		llvm::errs() << "lastStep : " << lastStep << "\n";
 		expr prev = z3_ctx.int_const(lastStep.c_str());
 		expr back = z3_ctx.int_const(joinPoint.c_str());
 		expr twoEventOrder = (prev < back);
