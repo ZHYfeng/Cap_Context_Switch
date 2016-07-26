@@ -1296,7 +1296,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 			ReturnInst *ri = cast<ReturnInst>(i);
 			KInstIterator kcaller = state.currentStack->realStack.back().caller;
 			Instruction *caller = kcaller ? kcaller->inst : 0;
-			llvm::errs() << "caller : " << caller << "\n";
+//			llvm::errs() << "caller : " << caller << "\n";
 			bool isVoidReturn = (ri->getNumOperands() == 0);
 			ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
 
@@ -1306,7 +1306,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
 			if (state.currentStack->realStack.size() <= 1) {
 				assert(!caller && "caller set on initial stack frame");
-				errs() << "state.currentStack->realStack.size() <= 1\n";
+//				llvm::errs() << "state.currentStack->realStack.size() <= 1\n";
 				//recover join thread
 				std::map<unsigned, std::vector<unsigned> >::iterator ji = state.joinRecord.find(state.currentThread->threadId);
 				if (ji != state.joinRecord.end()) {
@@ -1830,18 +1830,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
 		case Instruction::Load: {
 			ref<Expr> base = eval(ki, 0, state).value;
-			llvm::errs() << "base : " << base << "\n";
+//			llvm::errs() << "base : " << base << "\n";
 			executeMemoryOperation(state, false, base, 0, ki);
 			break;
 		}
 		case Instruction::Store: {
 			ref<Expr> base = eval(ki, 1, state).value;
-//			std::cerr << "base : ";
-//			base->dump();
+//			llvm::errs() << "base : " << base << "\n";
 			ref<Expr> value = eval(ki, 0, state).value;
-//			std::cerr << "value : ";
-//			value->dump();
-//			std::cerr << "Instruction::Store:\n";
+//			llvm::errs() << "value : " << value << "\n";
+//			llvm::errs() << "Instruction::Store:\n";
 			executeMemoryOperation(state, true, base, value, 0);
 			break;
 		}
@@ -1849,13 +1847,13 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 		case Instruction::GetElementPtr: {
 			KGEPInstruction *kgepi = static_cast<KGEPInstruction*>(ki);
 			ref<Expr> base = eval(ki, 0, state).value;
-//			std::cerr << "kgepi->base : ";
+//			llvm::errs() << "kgepi->base : ";
 //			base->dump();
 			for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie;
 					++it) {
 				uint64_t elementSize = it->second;
 				ref<Expr> index = eval(ki, it->first, state).value;
-//				std::cerr << "kgepi->index : ";
+//				llvm::errs() << "kgepi->index : ";
 //				index->dump();
 				base = AddExpr::create(base, MulExpr::create(Expr::createSExtToPointerWidth(index), Expr::createPointer(elementSize)));
 			}
@@ -1904,7 +1902,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 		case Instruction::BitCast: {
 			ref<Expr> result = eval(ki, 0, state).value;
 			bindLocal(ki, state, result);
-//			std::cerr << "BitCast : ";
+//			llvm::errs() << "BitCast : ";
 //			result->dump();
 			break;
 		}
@@ -2181,8 +2179,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 			} else {
 				ref<Expr> result = ExtractExpr::alloc(eval(ki, 0, state).value, 0, getWidthForLLVMType(fi->getType()));
 				result->isFloat = false;
-//			std::cerr << "fptosi in exe ";
-//			std::cerr << result->getKind() << "\n";
+//			llvm::errs() << "fptosi in exe ";
+//			llvm::errs() << result->getKind() << "\n";
 //			result->dump();
 				bindLocal(ki, state, result);
 			}
@@ -2647,9 +2645,10 @@ void Executor::run(ExecutionState &initialState) {
 					if (state.mutexManager.tryToLockForBlockedThread(thread->threadId, isBlocked, errorMsg)) {
 						if (isBlocked) {
 							if (prefix && !prefix->isFinished()) {
-								std::cerr << "thread" << thread->threadId << ": " << thread->pc->info->file << "/" << thread->pc->info->line
-										<< " " << thread->pc->inst->getOpcodeName() << std::endl;
-								std::cerr << "thread state is MUTEX_BLOCKED, try to get lock but failed\n";
+								llvm::errs() << "thread" << thread->threadId << ": " << thread->pc->info->file << "/" << thread->pc->info->line
+										<< " " << thread->pc->inst->getOpcodeName() << "\n";
+								thread->pc->inst->dump();
+								llvm::errs() << "thread state is MUTEX_BLOCKED, try to get lock but failed\n";
 								isAbleToRun = false;
 								break;
 								//assert(0 && "thread state is MUTEX_BLOCKED, try to get lock but failed");
@@ -2658,7 +2657,7 @@ void Executor::run(ExecutionState &initialState) {
 							thread = state.getNextThread();
 							if (thread == origin) {
 								if (deadlock) {
-									std::cerr << "perhaps deadlock happen\n";
+									llvm::errs() << "perhaps deadlock happen\n";
 									isAbleToRun = false;
 									break;
 									//assert(0 && "perhaps deadlock happen");
@@ -2670,7 +2669,7 @@ void Executor::run(ExecutionState &initialState) {
 							state.switchThreadToRunnable(thread);
 						}
 					} else {
-						std::cerr << errorMsg << std::endl;
+						llvm::errs() << errorMsg << "\n";
 						assert(0 && "try to get lock but failed");
 					}
 				} while (!thread->isRunnable());
@@ -2689,7 +2688,7 @@ void Executor::run(ExecutionState &initialState) {
 			//isExecutionSuccess = false;
 			execStatus = RUNTIMEERROR;
 			listenerService->executionFailed(state, state.currentThread->pc);
-			std::cerr << "thread unable to run, Id: " << thread->threadId << " state: " << thread->threadState << std::endl;
+			llvm::errs() << "thread unable to run, Id: " << thread->threadId << " state: " << thread->threadState << "\n";
 			terminateState(state);
 			break;
 			//assert(0 && "thread are unable to execute!");
@@ -2711,12 +2710,14 @@ void Executor::run(ExecutionState &initialState) {
 		KInstruction *ki = thread->pc;
 		if (prefix && !prefix->isFinished() && ki != prefix->getCurrentInst()) {
 			//cerr << "prefix: " << prefix->getCurrentInst() << " " << prefix->getCurrentInst()->inst->getOpcodeName() << " reality: " << ki << " " << ki->inst->getOpcodeName() << endl;
-			std::cerr << "thread id : " << thread->threadId << "\n";
+			llvm::errs() << "thread id : " << thread->threadId << "\n";
+			llvm::errs() << "real : ";
 			ki->inst->print(errs());
-			std::cerr << std::endl;
+			llvm::errs() << "\n";
+			llvm::errs() << "prefix : ";
 			prefix->getCurrentInst()->inst->print(errs());
-			std::cerr << std::endl;
-			std::cerr << "prefix unmatched\n";
+			llvm::errs() << "\n";
+			llvm::errs() << "prefix unmatched\n";
 			execStatus = IGNOREDERROR;
 			terminateState(state);
 			break;
@@ -2854,7 +2855,6 @@ const InstructionInfo & Executor::getLastNonKleeInternalInstruction(const Execut
 
 	// don't check beyond the outermost function (i.e. main())
 	itE--;
-
 	const InstructionInfo * ii = 0;
 	if (kmodule->internalFunctions.count(it->kf->function) == 0) {
 		ii = state.currentThread->prevPC->info;
@@ -2863,7 +2863,6 @@ const InstructionInfo & Executor::getLastNonKleeInternalInstruction(const Execut
 		//  it->function is not an internal function it might of
 		//  been called from an internal function.
 	}
-
 	// Wind up the stack and check if we are in a KLEE internal function.
 	// We visit the entire stack because we want to return a CallInstruction
 	// that was not reached via any KLEE internal functions.
@@ -2879,7 +2878,6 @@ const InstructionInfo & Executor::getLastNonKleeInternalInstruction(const Execut
 			*lastInstruction = (*it->caller).inst;
 		}
 	}
-
 	if (!ii) {
 		// something went wrong, play safe and return the current instruction info
 		*lastInstruction = state.currentThread->prevPC->inst;
@@ -2916,12 +2914,13 @@ void Executor::terminateStateOnError(ExecutionState &state, const llvm::Twine &m
 		std::string info_str = info.str();
 		if (info_str != "")
 			msg << "Info: \n" << info_str;
-
-		interpreterHandler->processTestCase(state, msg.str().c_str(), suffix);
+		//存在问题,暂时处理
+		//add by ylc
+//		interpreterHandler->processTestCase(state, msg.str().c_str(), suffix);
 	}
 
 	terminateState(state);
-	std::cerr << "encounter runtime error\n";
+	llvm::errs() << "encounter runtime error\n";
 	execStatus = RUNTIMEERROR;
 	listenerService->executionFailed(state, state.currentThread->pc);
 }
@@ -3035,9 +3034,9 @@ ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state, ref<Expr> e) 
 
 ObjectState *Executor::bindObjectInState(ExecutionState &state, const MemoryObject *mo, bool isLocal, const Array *array) {
 	ObjectState *os = array ? new ObjectState(mo, array) : new ObjectState(mo);
-//	std::cerr << "ObjectState *os = array ? new ObjectState(mo, array) : new ObjectState(mo);\n";
+//	llvm::errs() << "ObjectState *os = array ? new ObjectState(mo, array) : new ObjectState(mo);\n";
 	state.currentStack->addressSpace->bindObject(mo, os);
-//	std::cerr << "state.currentStack->addressSpace->bindObject(mo, os);\n";
+//	llvm::errs() << "state.currentStack->addressSpace->bindObject(mo, os);\n";
 
 	// Its possible that multiple bindings of the same mo in the state
 	// will put multiple copies on this list, but it doesn't really
@@ -3057,7 +3056,7 @@ void Executor::executeAlloc(ExecutionState &state, ref<Expr> size, bool isLocal,
 		if (!mo) {
 			bindLocal(target, state, ConstantExpr::alloc(0, Context::get().getPointerWidth()));
 		} else {
-//			std::cerr << "alloc address ; " << mo->address << " size : " << CE->getZExtValue() << "\n";
+//			llvm::errs() << "alloc address ; " << mo->address << " size : " << CE->getZExtValue() << "\n";
 			ObjectState *os = bindObjectInState(state, mo, isLocal);
 			if (zeroMemory) {
 				os->initializeToZero();
@@ -3423,7 +3422,12 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv, char **envp
 		}
 	}
 
-	ExecutionState *state = new ExecutionState(kmodule->functionMap[f]);
+	ExecutionState *state;
+	if (prefix) {
+		state = new ExecutionState(kmodule->functionMap[f], prefix);
+	} else {
+		state = new ExecutionState(kmodule->functionMap[f]);
+	}
 
 	if (pathWriter)
 		state->pathOS = pathWriter->open();
@@ -3665,8 +3669,8 @@ void Executor::runVerification(llvm::Function *f, int argc, char **argv, char **
 		execStatus = SUCCESS;
 		listenerService->startControl(this);
 		runFunctionAsMain(f, argc, argv, envp);
-		listenerService->endControl(this);
 		prepareNextExecution();
+		listenerService->endControl(this);
 	}
 }
 
@@ -3767,9 +3771,9 @@ void Executor::printInstrcution(ExecutionState &state, KInstruction* ki) {
 		ref<Expr> param = eval(ki, 0, state).value;
 		ConstantExpr* condition = dyn_cast<ConstantExpr>(param);
 		if (condition->getAPValue().getBoolValue() != event->brCondition) {
-			std::cerr << "\n前缀已被取反\n";
+			llvm::errs() << "\n前缀已被取反\n";
 		} else {
-			std::cerr << "\n前缀未被取反\n";
+			llvm::errs() << "\n前缀未被取反\n";
 		}
 	}
 }
@@ -3831,7 +3835,7 @@ unsigned Executor::executePThreadCreate(ExecutionState &state, KInstruction *ki,
 		Expr::Width type = elementType->getBitWidth();
 		ref<Expr> pidAddress = arguments[0];
 		executeMemoryOperation(state, true, pidAddress, ConstantExpr::create(newThread->threadId, type), 0);
-		llvm::errs() << "pidAddress : " << pidAddress << "\n";
+//		llvm::errs() << "pidAddress : " << pidAddress << "\n";
 	} else {
 		assert(0 && "inst must be callInst!");
 	}
@@ -3847,7 +3851,7 @@ unsigned Executor::executePThreadJoin(ExecutionState &state, KInstruction *ki, s
 	CallInst* calli = dyn_cast<CallInst>(ki->inst);
 	if (calli) {
 		ref<ConstantExpr> threadIdExpr = dyn_cast<ConstantExpr>(arguments[0]);
-		llvm::errs() << " joinedThreadId : " << threadIdExpr << "\n";
+//		llvm::errs() << " joinedThreadId : " << threadIdExpr << "\n";
 		unsigned threadId = threadIdExpr->getZExtValue();
 		Thread* joinThread = state.findThreadById(threadId);
 		if (joinThread) {
@@ -3891,7 +3895,7 @@ unsigned Executor::executePThreadCondWait(ExecutionState &state, KInstruction *k
 	if (isSuccess) {
 		state.swapOutThread(state.currentThread, true, false, false, false);
 	} else {
-		std::cerr << errorMsg << std::endl;
+		llvm::errs() << errorMsg << "\n";
 		assert(0 && "wait error");
 	}
 	return 0;
@@ -3925,7 +3929,7 @@ unsigned Executor::executePThreadCondSignal(ExecutionState &state, KInstruction 
 
 		}
 	} else {
-		std::cerr << errorMsg << std::endl;
+		llvm::errs() << errorMsg << "\n";
 		assert(0 && "signal failed");
 	}
 	return 0;
@@ -3961,7 +3965,7 @@ unsigned Executor::executePThreadCondBroadcast(ExecutionState &state, KInstructi
 
 		}
 	} else {
-		std::cerr << errorMsg << std::endl;
+		llvm::errs() << errorMsg << "\n";
 		assert(0 && "broadcast failed");
 	}
 	return 0;
@@ -3984,7 +3988,7 @@ unsigned Executor::executePThreadMutexLock(ExecutionState &state, KInstruction *
 				state.switchThreadToMutexBlocked(state.currentThread);
 			}
 		} else {
-			std::cerr << errorMsg << std::endl;
+			llvm::errs() << errorMsg << "\n";
 			assert(0 && "lock error!");
 		}
 	} else {
@@ -4004,7 +4008,7 @@ unsigned Executor::executePThreadMutexUnlock(ExecutionState &state, KInstruction
 		std::string errorMsg;
 		bool isSuccess = state.mutexManager.unlock(key, errorMsg);
 		if (!isSuccess) {
-			std::cerr << errorMsg << std::endl;
+			llvm::errs() << errorMsg << "\n";
 			assert(0 && "unlock error");
 		}
 	} else {
@@ -4029,7 +4033,7 @@ unsigned Executor::executePThreadBarrierInit(ExecutionState &state, KInstruction
 	std::string errorMsg;
 	bool isSuccess = state.barrierManager.init(barrierName, count->getZExtValue(), errorMsg);
 	if (!isSuccess) {
-		std::cerr << errorMsg << std::endl;
+		llvm::errs() << errorMsg << "\n";
 		assert(0 && "barrier init error");
 	}
 	return 0;
@@ -4062,7 +4066,7 @@ unsigned Executor::executePThreadBarrierWait(ExecutionState &state, KInstruction
 			state.swapOutThread(state.currentThread, false, true, false, false);
 		}
 	} else {
-		std::cerr << errorMsg << std::endl;
+		llvm::errs() << errorMsg << "\n";
 		assert("barrier wait error");
 	}
 	return 0;
@@ -4082,7 +4086,7 @@ unsigned Executor::executePThreadBarrierDestory(ExecutionState &state, KInstruct
 void Executor::handleInitializers(ExecutionState& initialState) {
 	for (Module::const_global_iterator i = kmodule->module->global_begin(), e = kmodule->module->global_end(); i != e; ++i) {
 		if (i->hasInitializer() && i->getName().str().at(0) != '.') {
-//			std::cerr << "name : " << i->getName().str() << "\n";
+//			llvm::errs() << "name : " << i->getName().str() << "\n";
 			Type* type = i->getInitializer()->getType();
 			ref<ConstantExpr> address = globalAddresses.find(i)->second;
 			uint64_t startAddress = address->getZExtValue();
@@ -4100,8 +4104,8 @@ void Executor::handleInitializers(ExecutionState& initialState) {
  */
 void Executor::createSpecialElement(ExecutionState& state, Type* type, uint64_t& startAddress, bool isInitializer) {
 
-//	std::cerr << "type : " << type->getTypeID() << std::endl;
-//	std::cerr << "startAddress : " << startAddress << std::endl;
+//	llvm::errs() << "type : " << type->getTypeID() << "\n";
+//	llvm::errs() << "startAddress : " << startAddress << "\n";
 
 	switch (type->getTypeID()) {
 
@@ -4147,7 +4151,7 @@ void Executor::createSpecialElement(ExecutionState& state, Type* type, uint64_t&
 
 		case Type::StructTyID: {
 			std::string errorMsg;
-//			std::cerr << "StructName : " << type->getStructName().str() << "\n";
+//			llvm::errs() << "StructName : " << type->getStructName().str() << "\n";
 			//下列代码只是为了处理三种特殊结构体的内存对齐，对于复杂对象，其第一个元素在被访问时会计算内存对齐，因此不需要额外对复杂对象计算
 			//内存对齐，这里计算结构体的内存对齐只是因为mutex，cond，barrier三种类型不会被解析，因此需要提前计算。
 			DataLayout* layout = kmodule->targetData;
@@ -4160,7 +4164,7 @@ void Executor::createSpecialElement(ExecutionState& state, Type* type, uint64_t&
 				if (type->getStructName() == "union.pthread_mutex_t") {
 					std::string mutexName = Transfer::uint64toString(startAddress);
 					state.mutexManager.addMutex(mutexName, errorMsg);
-//					std::cerr << "mutexName : " << mutexName << "\n";
+//					llvm::errs() << "mutexName : " << mutexName << "\n";
 					startAddress += kmodule->targetData->getTypeSizeInBits(type) / 8;
 				} else if (type->getStructName() == "union.pthread_cond_t") {
 					std::string condName = Transfer::uint64toString(startAddress);

@@ -33,9 +33,8 @@
 using namespace std;
 using namespace llvm;
 
-#define EVENTS_DEBUG 1
 #define PTR 1
-#define DEBUGSYMBOLIC 1
+#define DEBUGSYMBOLIC 0
 #define BIT_WIDTH 64
 
 namespace klee {
@@ -70,7 +69,7 @@ namespace klee {
 						unsigned line = ki->info->line;
 						assertMap[fileName].push_back(line);
 //						printf("fileName : %s, line : %d\n",fileName.c_str(),line);
-//						std::cerr << "call name : " << f->getName().str() << "\n";
+//						llvm::errs() << "call name : " << f->getName().str() << "\n";
 					}
 				}
 			}
@@ -84,9 +83,9 @@ namespace klee {
 		if (currentEvent) {
 			Instruction* inst = ki->inst;
 //		Thread* thread = state.currentThread;
-//		cerr << "event name : " << currentEvent->eventName << " ";
-//		cerr << "thread
-//		cerr << "thread id : " << currentEvent->threadId ;
+//		llvm::errs() << "event name : " << currentEvent->eventName << " ";
+//		llvm::errs() << "thread
+//		llvm::errs() << "thread id : " << currentEvent->threadId ;
 //		currentEvent->inst->inst->dump();
 			switch (inst->getOpcode()) {
 				case Instruction::Load: {
@@ -106,10 +105,10 @@ namespace klee {
 
 					ref<Expr> value = executor->eval(ki, 0, state).value;
 					Type::TypeID id = ki->inst->getOperand(0)->getType()->getTypeID();
-//			cerr << "store value : " << value << std::endl;
-//			cerr << "store base : " << base << std::endl;
-//			cerr << "value->getKind() : " << value->getKind() << std::endl;
-//			cerr << "TypeID id : " << id << std::endl;
+//			llvm::errs() << "store value : " << value << "\n";
+//			llvm::errs() << "store base : " << base << "\n";
+//			llvm::errs() << "value->getKind() : " << value->getKind() << "\n";
+//			llvm::errs() << "TypeID id : " << id << "\n";
 					bool isFloat = 0;
 					if ((id >= Type::HalfTyID) && (id <= Type::DoubleTyID)) {
 						isFloat = 1;
@@ -121,8 +120,8 @@ namespace klee {
 							ref<Expr> symbolic = manualMakeSymbolic(state, currentEvent->globalName, size, isFloat);
 							ref<Expr> constraint = EqExpr::create(value, symbolic);
 							trace->storeSymbolicExpr.push_back(constraint);
-//					cerr << "event name : " << currentEvent->eventName << "\n";
-//					cerr << "store constraint : " << constraint << "\n";
+//					llvm::errs() << "event name : " << currentEvent->eventName << "\n";
+//					llvm::errs() << "store constraint : " << constraint << "\n";
 						}
 					}
 					break;
@@ -190,19 +189,19 @@ namespace klee {
 						ref<Expr> value = executor->evalCurrent(ki, 0, state).value;
 						executor->ineval(ki, 0, state, value);
 					}
-//			std::cerr<<"isFunctionWithSourceCode : ";
+//			llvm::errs()<<"isFunctionWithSourceCode : ";
 //					currentEvent->inst->inst->dump();
-//			std::cerr<<"isFunctionWithSourceCode : ";
+//			llvm::errs()<<"isFunctionWithSourceCode : ";
 //					inst->dump();
-//			std::cerr<<"isFunctionWithSourceCode : "<<currentEvent->isFunctionWithSourceCode<<"\n";
+//			llvm::errs()<<"isFunctionWithSourceCode : "<<currentEvent->isFunctionWithSourceCode<<"\n";
 					if (!currentEvent->isFunctionWithSourceCode) {
 						unsigned numArgs = cs.arg_size();
 						for (unsigned j = numArgs; j > 0; j--) {
 							ref<Expr> value = executor->eval(ki, j, state).value;
 							Type::TypeID id = cs.getArgument(j - 1)->getType()->getTypeID();
-//					cerr << "value->getKind() : " << value->getKind() << std::endl;
-//					cerr << "TypeID id : " << id << std::endl;
-//		    		cerr<<"value : " << value << "\n";
+//					llvm::errs() << "value->getKind() : " << value->getKind() << "\n";
+//					llvm::errs() << "TypeID id : " << id << "\n";
+//		    		llvm::errs()<<"value : " << value << "\n";
 							bool isFloat = 0;
 							if ((id >= Type::HalfTyID) && (id <= Type::DoubleTyID)) {
 								isFloat = 1;
@@ -228,24 +227,24 @@ namespace klee {
 						ref<Expr> value = executor->evalCurrent(ki, 0, state).value;
 						executor->ineval(ki, 0, state, value);
 					}
-//					std::cerr << "kgepi->base : " << base << std::endl;
+//					llvm::errs() << "kgepi->base : " << base << "\n";
 					for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end();
 							it != ie; ++it) {
 						ref<Expr> index = executor->eval(ki, it->first, state).value;
-//					std::cerr << "kgepi->index : " << index << std::endl;
-//					std::cerr << "first : " << *first << std::endl;
+//					llvm::errs() << "kgepi->index : " << index << "\n";
+//					llvm::errs() << "first : " << *first << "\n";
 						if (index->getKind() != Expr::Constant) {
 							ref<Expr> value = executor->evalCurrent(ki, it->first, state).value;
 							executor->ineval(ki, it->first, state, value);
 							ref<Expr> constraint = EqExpr::create(index, value);
-//					cerr << "event name : " << currentEvent->eventName << "\n";
-//					cerr << "constraint : " << constraint << "\n";
+//					llvm::errs() << "event name : " << currentEvent->eventName << "\n";
+//					llvm::errs() << "constraint : " << constraint << "\n";
 							trace->brSymbolicExpr.push_back(constraint);
 							trace->brEvent.push_back(currentEvent);
 						}
 					}
 					if (kgepi->offset) {
-//						std::cerr << "kgepi->offset : " << kgepi->offset << std::endl;
+//						llvm::errs() << "kgepi->offset : " << kgepi->offset << "\n";
 						//目前没有这种情况...
 //						assert(0 && "kgepi->offset");
 					}
@@ -274,7 +273,7 @@ namespace klee {
 			Thread* thread = state.currentThread;
 			switch (inst->getOpcode()) {
 				case Instruction::Load: {
-//			cerr << "value : " << value << "\n";
+//			llvm::errs() << "value : " << value << "\n";
 					bool isFloat = 0;
 					Type::TypeID id = ki->inst->getType()->getTypeID();
 					if ((id >= Type::HalfTyID) && (id <= Type::DoubleTyID)) {
@@ -292,10 +291,10 @@ namespace klee {
 							ref<Expr> value = executor->getDestCell(state, ki).value;
 							ref<Expr> symbolic = manualMakeSymbolic(state, currentEvent->globalName, size, isFloat);
 							executor->bindLocal(ki, state, symbolic);
-//							cerr << "load globalVarFullName : " << currentEvent->globalVarFullName << "\n";
-//							cerr << "load value : " << value << "\n";
+//							llvm::errs() << "load globalVarFullName : " << currentEvent->globalVarFullName << "\n";
+//							llvm::errs() << "load value : " << value << "\n";
 							ref<Expr> constraint = EqExpr::create(value, symbolic);
-//							cerr << "rwSymbolicExpr : " << constraint << "\n";
+//							llvm::errs() << "rwSymbolicExpr : " << constraint << "\n";
 							trace->rwSymbolicExpr.push_back(constraint);
 							trace->rwEvent.push_back(currentEvent);
 						}
@@ -336,7 +335,7 @@ namespace klee {
 					}
 //			if (!executor->kmodule->functionMap[f] && !inst->getType()->isVoidTy()) {
 //				ref<Expr> value = executor->getDestCell(state, ki).value;
-//				cerr << "value : " << value << "\n";
+//				llvm::errs() << "value : " << value << "\n";
 //			}
 					if (f->getName().startswith("klee_div_zero_check")) {
 						kleeBr = true;
@@ -347,17 +346,17 @@ namespace klee {
 				}
 				case Instruction::PHI: {
 //			ref<Expr> result = executor->eval(ki, thread->incomingBBIndex, state).value;
-//			cerr << "PHI : " << result << "\n";
+//			llvm::errs() << "PHI : " << result << "\n";
 					break;
 				}
 				case Instruction::GetElementPtr: {
 //			ref<Expr> value = executor->getDestCell(state, ki).value;
-//			cerr << "value : " << value << "\n";
+//			llvm::errs() << "value : " << value << "\n";
 					break;
 				}
 				case Instruction::SExt: {
 //			ref<Expr> value = executor->getDestCell(state, ki).value;
-//			cerr << "value : " << value << "\n";
+//			llvm::errs() << "value : " << value << "\n";
 					break;
 				}
 				default: {
@@ -371,20 +370,12 @@ namespace klee {
 
 //消息响应函数，在被测程序解释执行之后调用
 	void SymbolicListener::afterRunMethodAsMain(ExecutionState &state) {
-
 		assertMap.clear();
-
-		cerr << "######################本条路径为新路径####################\n";
-#if EVENTS_DEBUG
-		//true: output to file; false: output to terminal
-		rdManager->printCurrentTrace(true);
-		//			encode.showInitTrace();//need to be modified
-#endif
 	}
 
 //消息相应函数，在前缀执行出错之后程序推出之前调用
 	void SymbolicListener::executionFailed(ExecutionState &state, KInstruction *ki) {
-		rdManager->getCurrentTrace()->traceType = Trace::FAILED;
+
 	}
 
 	ref<Expr> SymbolicListener::manualMakeSymbolic(ExecutionState& state, std::string name, unsigned size, bool isFloat) {
@@ -398,10 +389,10 @@ namespace klee {
 			result.get()->isFloat = true;
 		}
 #if DEBUGSYMBOLIC
-		cerr << "Event name : " << currentEvent->eventName << "\n";
-		cerr << "make symboic:" << name << std::endl;
-		cerr << "is float:" << isFloat << std::endl;
-		std::cerr << "result : ";
+		llvm::errs() << "event name : " << currentEvent->eventName << "\n";
+		llvm::errs() << "make symboic:" << name << "\n";
+		llvm::errs() << "is float:" << isFloat << "\n";
+		llvm::errs() << "result : ";
 		result->dump();
 #endif
 		return result;

@@ -61,7 +61,7 @@ namespace klee {
 		//收集全局变量初始化值
 		for (Module::global_iterator i = m->global_begin(), e = m->global_end(); i != e; ++i) {
 			if (i->hasInitializer() && i->getName().str().at(0) != '.') {
-//				std::cerr << "name : " << i->getName().str() << "\n";
+//				llvm::errs() << "name : " << i->getName().str() << "\n";
 				MemoryObject *mo = executor->globalObjects.find(i)->second;
 				Constant* initializer = i->getInitializer();
 				uint64_t address = mo->address;
@@ -70,16 +70,16 @@ namespace klee {
 		}
 
 		unsigned traceNum = executor->executionNum;
-		cerr << endl;
-		cerr << "************************************************************************\n";
-		cerr << "第" << traceNum << "次执行,路径文件为trace" << traceNum << ".txt";
+		llvm::errs() << "\n";
+		llvm::errs() << "************************************************************************\n";
+		llvm::errs() << "第" << traceNum << "次执行,路径文件为trace" << traceNum << ".txt";
 		if (traceNum == 1) {
-			cerr << " 初始执行" << endl;
+			llvm::errs() << " 初始执行" << "\n";
 		} else {
-			cerr << " 前缀执行,前缀文件为prefix" << executor->prefix->getName() << ".txt" << endl;
+			llvm::errs() << " 前缀执行,前缀文件为prefix" << executor->prefix->getName() << ".txt" << "\n";
 		}
-		cerr << "************************************************************************\n";
-		cerr << endl;
+		llvm::errs() << "************************************************************************\n";
+		llvm::errs() << "\n";
 	}
 
 //指令调用消息响应函数，在指令解释执行前被调用
@@ -90,8 +90,8 @@ namespace klee {
 		Event* item = NULL;
 		KModule* kmodule = executor->kmodule;
 
-//	cerr << "thread id : " << thread->threadId << " line : " << ki->info->line;
-//	inst->dump();
+//		llvm::errs() << "PSO thread id : " << thread->threadId;
+//		inst->dump();
 
 // filter the instruction linked by klee force-import such as klee_div_zero_check
 		if (kmodule->internalFunctions.find(inst->getParent()->getParent()) == kmodule->internalFunctions.end()) {
@@ -99,11 +99,11 @@ namespace klee {
 		} else {
 			item = trace->createEvent(thread->threadId, ki, Event::IGNORE);
 		}
-		errs() << "event name : " << item->eventName << "\n";
+//		llvm::errs() << "PSO event name : " << item->eventName << "\n";
 
 		vector<Event*> frontVirtualEvents, backVirtualEvents; // the virtual event which should be inserted before/behind item
-		frontVirtualEvents.reserve(10);
-		backVirtualEvents.reserve(10);
+		frontVirtualEvents.reserve(1);
+		backVirtualEvents.reserve(1);
 		switch (inst->getOpcode()) {
 			case Instruction::Call: {
 //		inst->dump();
@@ -121,7 +121,7 @@ namespace klee {
 						&& kmodule->internalFunctions.find(f) == kmodule->internalFunctions.end()) {
 					item->isFunctionWithSourceCode = false;
 				}
-//		std::cerr<<"isFunctionWithSourceCode : "<<item->isFunctionWithSourceCode<<"\n";
+//		llvm::errs()<<"isFunctionWithSourceCode : "<<item->isFunctionWithSourceCode<<"\n";
 
 				//by hy
 				//store all call arg
@@ -133,7 +133,7 @@ namespace klee {
 					}
 				}
 
-//		std::cerr<<"call name : "<< f->getName().str().c_str() <<"\n";
+//		llvm::errs()<<"call name : "<< f->getName().str().c_str() <<"\n";
 				if (f->getName().str() == "pthread_create") {
 					ref<Expr> pthreadAddress = executor->eval(ki, 1, state).value;
 					ObjectPair pthreadop;
@@ -162,31 +162,21 @@ namespace klee {
 					ConstantExpr* joinedThreadIdExpr = dyn_cast<ConstantExpr>(param);
 					uint64_t joinedThreadId = joinedThreadIdExpr->getZExtValue(paramType->getBitWidth());
 					trace->insertThreadCreateOrJoin(make_pair(item, joinedThreadId), false);
-					llvm::errs() << "event name : " << item->eventName << " joinedThreadId : " << param << "\n";
-					ref<Expr> pparam = executor->evalCurrent(ki, 1, state).value;
-					llvm::errs() << "event name : " << item->eventName << " joinedThreadId : " << pparam << "\n";
-				} else if (f->getName().str() == "pthread_cond_wait") {
+//					llvm::errs() << "event name : " << item->eventName << " joinedThreadId : " << param << "\n";
+ 				} else if (f->getName().str() == "pthread_cond_wait") {
 					ref<Expr> param;
 					ObjectPair op;
-					Event *lock, *unlock;
+					Event *lock;
 					bool success;
 					param = executor->eval(ki, 2, state).value;
 					success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, param);
 					if (success) {
 						const MemoryObject* mo = op.first;
 						string mutexName = createVarName(mo->id, param, executor->isGlobalMO(mo));
-						unlock = trace->createEvent(thread->threadId, ki, Event::VIRTUAL);
-						unlock->calledFunction = f;
-						string temp = item->eventName;
-						item->eventName = unlock->eventName;
-						unlock->eventName = temp;
-						unlock->eventName = item->eventName;
-						frontVirtualEvents.push_back(unlock);
 						lock = trace->createEvent(thread->threadId, ki, Event::VIRTUAL);
 						lock->calledFunction = f;
-						frontVirtualEvents.push_back(unlock);
 						backVirtualEvents.push_back(lock);
-						trace->insertLockOrUnlock(thread->threadId, mutexName, unlock, false);
+						trace->insertLockOrUnlock(thread->threadId, mutexName, item, false);
 						trace->insertLockOrUnlock(thread->threadId, mutexName, lock, true);
 					} else {
 						assert(0 && "mutex not exist");
@@ -202,8 +192,8 @@ namespace klee {
 					}
 #if COND_DEBUG
 					ki->inst->dump();
-					cerr << "event name : " << item->eventName << "\n";
-					cerr << "wait : " << item->condName << "\n";
+					llvm::errs() << "event name : " << item->eventName << "\n";
+					llvm::errs() << "wait : " << item->condName << "\n";
 #endif
 				} else if (f->getName().str() == "pthread_cond_signal") {
 					ref<Expr> param = executor->eval(ki, 1, state).value;
@@ -218,8 +208,8 @@ namespace klee {
 					}
 #if COND_DEBUG
 					ki->inst->dump();
-					cerr << "event name : " << item->eventName << "\n";
-					cerr << "signal  : " << item->condName << "\n";
+					llvm::errs() << "event name : " << item->eventName << "\n";
+					llvm::errs() << "signal  : " << item->condName << "\n";
 #endif
 				} else if (f->getName().str() == "pthread_cond_broadcast") {
 					ref<Expr> param = executor->eval(ki, 1, state).value;
@@ -234,8 +224,8 @@ namespace klee {
 					}
 #if COND_DEBUG
 					ki->inst->dump();
-					cerr << "event name : " << item->eventName << "\n";
-					cerr << "broadcast cond  : " << item->condName << "\n";
+					llvm::errs() << "event name : " << item->eventName << "\n";
+					llvm::errs() << "broadcast cond  : " << item->condName << "\n";
 #endif
 				} else if (f->getName().str() == "pthread_mutex_lock") {
 					ref<Expr> param = executor->eval(ki, 1, state).value;
@@ -273,7 +263,7 @@ namespace klee {
 					}
 					string barrierName = createBarrierName(barrierAddress, barrierInfo->releasedCount);
 					trace->insertBarrierOperation(barrierName, item);
-					//					cerr << "insert " << barrierName << " " << item->eventName << endl;
+					//					llvm::errs() << "insert " << barrierName << " " << item->eventName << "\n";
 					bool isReleased = barrierInfo->addWaitItem();
 					if (isReleased) {
 						barrierInfo->addReleaseItem();
@@ -323,7 +313,7 @@ namespace klee {
 				} else if (kmodule->internalFunctions.find(f) != kmodule->internalFunctions.end()) {
 					item->eventType = Event::IGNORE;
 				}
-				//cerr << item->calledFunction->getName().str() << " " << item->isUserDefinedFunction << endl;
+				//llvm::errs() << item->calledFunction->getName().str() << " " << item->isUserDefinedFunction << "\n";
 				break;
 			}
 
@@ -339,7 +329,7 @@ namespace klee {
 				for (std::vector<std::pair<unsigned, uint64_t> >::iterator it = kgepi->indices.begin(), ie = kgepi->indices.end(); it != ie;
 						++it) {
 					ref<Expr> index = executor->eval(ki, it->first, state).value;
-//			std::cerr << "kgepi->index : " << index << std::endl;
+//			llvm::errs() << "kgepi->index : " << index << "\n";
 					item->instParameter.push_back(index);
 				}
 				if (kgepi->offset) {
@@ -400,7 +390,7 @@ namespace klee {
 
 							}
 						} else {
-							cerr << "Load address = " << realAddress->getZExtValue() << endl;
+							llvm::errs() << "Load address = " << realAddress->getZExtValue() << "\n";
 							assert(0 && "load resolve unsuccess");
 						}
 					} else {
@@ -417,20 +407,20 @@ namespace klee {
 				if (realValue) {
 					Type* valueTy = ki->inst->getOperand(0)->getType();
 					if (valueTy->isPointerTy()) {
-//						std::cerr << "valueTy->isPointerTy()\n";
+//						llvm::errs() << "valueTy->isPointerTy()\n";
 						uint64_t startAddress = realValue->getZExtValue();
 						valueTy = valueTy->getPointerElementType();
 						executor->createSpecialElement(state, valueTy, startAddress, false);
 					}
 				}
-//				std::cerr << "PSO Store\n";
+//				llvm::errs() << "PSO Store\n";
 				ref<Expr> address = executor->eval(ki, 1, state).value;
 				ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address);
-//				std::cerr << "address : ";
+//				llvm::errs() << "address : ";
 //				address->dump();
 				if (realAddress) {
 					uint64_t key = realAddress->getZExtValue();
-//					std::cerr << "key : " << key << std::endl;
+//					llvm::errs() << "key : " << key << "\n";
 					ObjectPair op;
 					bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 					if (success) {
@@ -454,7 +444,7 @@ namespace klee {
 							trace->insertWriteSet(varName, item);
 						}
 					} else {
-						cerr << "Store address = " << realAddress->getZExtValue() << endl;
+						llvm::errs() << "Store address = " << realAddress->getZExtValue() << "\n";
 						assert(0 && "store resolve unsuccess");
 					}
 				} else {
@@ -504,7 +494,7 @@ namespace klee {
 					f = (Function*) functionPtr;
 				}
 
-//		std::cerr<<"call name : "<< f->getName().str().c_str() <<"\n";
+//		llvm::errs()<<"call name : "<< f->getName().str().c_str() <<"\n";
 				if (f->getName().str() == "pthread_create") {
 					ref<Expr> pthreadAddress = executor->eval(ki, 1, state).value;
 					Expr::Width type = executor->getWidthForLLVMType(inst->getType());
@@ -512,13 +502,13 @@ namespace klee {
 					ConstantExpr* pidConstant = dyn_cast<ConstantExpr>(pid);
 					uint64_t pidInt = pidConstant->getZExtValue();
 					trace->insertThreadCreateOrJoin(make_pair(currentEvent, pidInt), true);
-					llvm::errs() << "PSO pthread_create event name : " << currentEvent->eventName << " pid : " << pid << "\n";
+//					llvm::errs() << "PSO pthread_create event name : " << currentEvent->eventName << " pid : " << pid << "\n";
 				}
 				break;
 			}
 			case Instruction::Load: {
 				ref<Expr> value = executor->getDestCell(state, ki).value;
-				llvm::errs() << "PSO load : " << value << "\n";
+//				llvm::errs() << "PSO load : " << value << "\n";
 				break;
 			}
 
@@ -530,37 +520,6 @@ namespace klee {
 
 //消息响应函数，在被测程序解释执行之后调用
 	void PSOListener::afterRunMethodAsMain(ExecutionState &state) {
-		Trace* trace = rdManager->getCurrentTrace();
-		unsigned allGlobal = 0;
-		if (executor->execStatus != Executor::SUCCESS) {
-			cerr << "######################执行有错误,放弃本次执行####################\n";
-			executor->isFinished = true;
-			//		if (rdManager.getCurrentTrace()->traceType == Trace::FAILED) {
-			//			cerr
-			//					<< "######################错误来自于前缀#############################\n";
-			//		} else {
-			//			cerr
-			//					<< "######################错误来自于执行#############################\n";
-			//		}
-		} else if (!rdManager->isCurrentTraceUntested()) {
-			rdManager->getCurrentTrace()->traceType = Trace::REDUNDANT;
-			cerr << "######################本条路径为旧路径####################\n";
-			executor->getNewPrefix();
-		} else {
-
-			std::map<std::string, std::vector<Event *> > &writeSet = trace->writeSet;
-			std::map<std::string, std::vector<Event *> > &readSet = trace->readSet;
-			for (std::map<std::string, std::vector<Event *> >::iterator nit = readSet.begin(), nie = readSet.end(); nit != nie; ++nit) {
-				allGlobal += nit->second.size();
-			}
-			for (std::map<std::string, std::vector<Event *> >::iterator nit = writeSet.begin(), nie = writeSet.end(); nit != nie; ++nit) {
-				std::string varName = nit->first;
-				if (trace->readSet.find(varName) == trace->readSet.end()) {
-					allGlobal += nit->second.size();
-				}
-			}
-			rdManager->allGlobal += allGlobal;
-		}
 	}
 
 //消息相应函数，在前缀执行出错之后程序推出之前调用
@@ -580,7 +539,7 @@ namespace klee {
 			}
 			string globalVariableName = createVarName(mo->id, startAddress, executor->isGlobalMO(mo));
 			trace->insertGlobalVariableInitializer(globalVariableName, initializer);
-//		cerr << "globalVariableName : " << globalVariableName << "    value : "
+//		llvm::errs() << "globalVariableName : " << globalVariableName << "    value : "
 //				<< executor->evalConstant(initializer) << "\n";
 			//startAddress += TypeUtils::getPrimitiveTypeWidth(type);
 			startAddress += executor->kmodule->targetData->getTypeSizeInBits(type) / 8;
@@ -592,7 +551,7 @@ namespace klee {
 			}
 			string globalVariableName = createVarName(mo->id, startAddress, executor->isGlobalMO(mo));
 			trace->insertGlobalVariableInitializer(globalVariableName, initializer);
-//		cerr << "globalVariableName : " << globalVariableName << "    value : "
+//		llvm::errs() << "globalVariableName : " << globalVariableName << "    value : "
 //				<< executor->evalConstant(initializer) << "\n";
 			//startAddress += TypeUtils::getPrimitiveTypeWidth(type);
 			startAddress += executor->kmodule->targetData->getTypeSizeInBits(type) / 8;
@@ -649,7 +608,7 @@ namespace klee {
 				}
 
 				default: {
-					std::cerr << caggregate->getType()->getTypeID() << std::endl;
+					llvm::errs() << caggregate->getType()->getTypeID() << "\n";
 					assert(0 && "unknown aggregatezero type");
 				}
 
@@ -690,7 +649,7 @@ namespace klee {
 				handleInitializer(element, mo, startAddress);
 			}
 		} else {
-//			std::cerr << "value = " << initializer->getValueID() << " type = " << initializer->getType()->getTypeID() << std::endl;
+//			llvm::errs() << "value = " << initializer->getValueID() << " type = " << initializer->getType()->getTypeID() << "\n";
 //			assert(0 && "unsupported initializer");
 		}
 	}
@@ -709,7 +668,7 @@ namespace klee {
 			}
 
 			default: {
-//				cerr << expr->getOpcode() << endl;
+//				llvm::errs() << expr->getOpcode() << "\n";
 //				assert(0 && "unsupported Opcode");
 			}
 
@@ -756,9 +715,9 @@ namespace klee {
 //
 //		ConstantExpr *caddress = cast<ConstantExpr>(scrAddress);
 //		uint64_t scraddress = caddress->getZExtValue();
-//		std::cerr << "dest" <<executor->isGlobalMO(scrmo)<< std::endl;
+//		llvm::errs() << "dest" <<executor->isGlobalMO(scrmo)<< "\n";
 //		for (unsigned i = 0; i < scrmo->size; i++) {
-//			std::cerr << "dest" << std::endl;
+//			llvm::errs() << "dest" << "\n";
 //			ref<Expr> ch = scros->read(i, 8);
 //			Constant* constant = Transfer::expr2Constant(ch.get(),
 //					Type::getInt8Ty(inst->getContext()));
@@ -772,7 +731,7 @@ namespace klee {
 //				lastEvent->isGlobal = true;
 //			}
 //			lastEvent->scrVariables.insert(make_pair(name, constant));
-//			//cerr << "address = " << name << "value = " << ((ConstantInt*)constant)->getSExtValue() << endl;
+//			//llvm::errs() << "address = " << name << "value = " << ((ConstantInt*)constant)->getSExtValue() << "\n";
 //			//判断是否是字符串的末尾
 //			if (cexpr->getZExtValue() == 0) {
 //				break;
@@ -798,10 +757,10 @@ namespace klee {
 					currentEvent->isGlobal = true;
 				}
 #if DEBUGSTRCPY
-				cerr << "Event name : " << currentEvent->eventName << "\n";
-				cerr<<"name : "<<name<<std::endl;
+				llvm::errs() << "Event name : " << currentEvent->eventName << "\n";
+				llvm::errs()<<"name : "<<name<<"\n";
 #endif
-				//cerr << "address = " << name << "value = " << ((ConstantInt*)constant)->getSExtValue() << endl;
+				//llvm::errs() << "address = " << name << "value = " << ((ConstantInt*)constant)->getSExtValue() << "\n";
 				//判断是否是字符串的末尾
 				if (cexpr->getZExtValue() == 0) {
 					break;
@@ -864,11 +823,11 @@ namespace klee {
 				}
 
 //		if (constant->getType()->isIntegerTy()) {
-//			cerr << variableName << " " << ((ConstantInt*)constant)->getSExtValue() << endl;
+//			llvm::errs() << variableName << " " << ((ConstantInt*)constant)->getSExtValue() << "\n";
 //		} else if (constant->getType()->isFloatTy()) {
-//			cerr << variableName << " " << ((ConstantFP*)constant)->getValueAPF().convertToFloat() << endl;
+//			llvm::errs() << variableName << " " << ((ConstantFP*)constant)->getValueAPF().convertToFloat() << "\n";
 //		} else if (constant->getType()->isDoubleTy()) {
-//			cerr << variableName << " " << ((ConstantFP*)constant)->getValueAPF().convertToDouble() << endl;
+//			llvm::errs() << variableName << " " << ((ConstantFP*)constant)->getValueAPF().convertToDouble() << "\n";
 //		}
 				break;
 			}
@@ -900,7 +859,7 @@ namespace klee {
 			}
 
 			default: {
-				cerr << "typeID: " << type->getTypeID() << endl;
+				llvm::errs() << "typeID: " << type->getTypeID() << "\n";
 				assert(0 && "unsupport type");
 			}
 
@@ -960,7 +919,7 @@ namespace klee {
 			unsigned index = -vnumber - 2;
 			result = executor->kmodule->constantTable[index].value;
 		} else {
-			//cerr << "locals = " << sf->locals << " vnumber = " << vnumber << " function name = " << sf->kf->function->getName().str() << endl;
+			//llvm::errs() << "locals = " << sf->locals << " vnumber = " << vnumber << " function name = " << sf->kf->function->getName().str() << "\n";
 			result = sf->locals[vnumber].value;
 		}
 		ConstantExpr* addrExpr = dyn_cast<klee::ConstantExpr>(result);

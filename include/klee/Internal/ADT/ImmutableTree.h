@@ -506,7 +506,7 @@ namespace klee {
         return &n->value;
       }
     }
-//    std::cerr << "n->isTerminator()\n";
+//    llvm::errs() << "n->isTerminator()\n";
     return result ? &result->value : 0;
   }
 

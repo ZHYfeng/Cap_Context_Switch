@@ -65,7 +65,7 @@ namespace klee {
 
 		Instruction* inst = ki->inst;
 //		Thread* thread = state.currentThread;
-//	std::cerr << "thread id : " << thread->threadId << " ";
+//	llvm::errs() << "thread id : " << thread->threadId << " ";
 //	inst->dump();
 		if (currentEvent) {
 			switch (inst->getOpcode()) {
@@ -85,15 +85,15 @@ namespace klee {
 					}
 
 					ref<Expr> value = executor->eval(ki, 0, state).value;
-//					cerr << "value : ";
+//					llvm::errs() << "value : ";
 //					value->dump();
 					bool isTaint = value->isTaint;
 					std::vector<ref<klee::Expr> >* relatedSymbolicExpr = &(currentEvent->relatedSymbolicExpr);
 					filter.resolveTaintExpr(value, currentEvent->relatedSymbolicExpr, isTaint);
-//			cerr << "relatedSymbolicExpr" << "\n";
+//			llvm::errs() << "relatedSymbolicExpr" << "\n";
 //			for (std::vector<ref<klee::Expr> >::iterator it = relatedSymbolicExpr->begin();
 //					it != relatedSymbolicExpr->end(); it++) {
-//				cerr << "name : " << *it << " isTaint : " << (*it)->isTaint << "\n";
+//				llvm::errs() << "name : " << *it << " isTaint : " << (*it)->isTaint << "\n";
 //			}
 					ObjectPair op;
 					executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
@@ -143,7 +143,7 @@ namespace klee {
 							}
 							ref<Expr> constraint = EqExpr::create(temp, symbolic);
 							trace->taintExpr.push_back(constraint);
-//					cerr << constraint << "isTaint : " << isTaint << "\n" ;
+//					llvm::errs() << constraint << "isTaint : " << isTaint << "\n" ;
 						}
 					}
 					break;
@@ -224,8 +224,8 @@ namespace klee {
 							ref<Expr> value = executor->evalCurrent(ki, it->first, state).value;
 							executor->ineval(ki, it->first, state, value);
 							ref<Expr> constraint = EqExpr::create(index, value);
-//					cerr << "event name : " << currentEvent->eventName << "\n";
-//					cerr << "constraint : " << constraint << "\n";
+//					llvm::errs() << "event name : " << currentEvent->eventName << "\n";
+//					llvm::errs() << "constraint : " << constraint << "\n";
 						}
 					}
 					if (kgepi->offset) {
@@ -264,7 +264,7 @@ namespace klee {
 					if (currentEvent->isGlobal) {
 						for (unsigned i = 0; i < thread->vectorClock.size(); i++) {
 							currentEvent->vectorClock.push_back(thread->vectorClock[i]);
-//					cerr << "vectorClock " << i << " : " << currentEvent->vectorClock[i] << "\n";
+//					llvm::errs() << "vectorClock " << i << " : " << currentEvent->vectorClock[i] << "\n";
 						}
 #if PTR
 						if (isFloat || id == Type::IntegerTyID || id == Type::PointerTyID) {
@@ -274,7 +274,7 @@ namespace klee {
 							Expr::Width size = executor->getWidthForLLVMType(ki->inst->getType());
 							ref<Expr> symbolic = manualMakeTaintSymbolic(state, currentEvent->globalName, size);
 							executor->getDestCell(state, ki).value = symbolic;
-//							std::cerr << "globalVarFullName : " << currentEvent->globalVarFullName << "\n";
+//							llvm::errs() << "globalVarFullName : " << currentEvent->globalVarFullName << "\n";
 						}
 					}
 					ref<Expr> address = executor->eval(ki, 0, state).value;
@@ -295,14 +295,14 @@ namespace klee {
 						manualMakeTaint(value, false);
 					}
 					executor->getDestCell(state, ki).value = value;
-//					cerr << value << " taint : " << isTaint << "\n";
+//					llvm::errs() << value << " taint : " << isTaint << "\n";
 					break;
 				}
 				case Instruction::Store: {
 					if (currentEvent->isGlobal) {
 						for (unsigned i = 0; i < thread->vectorClock.size(); i++) {
 							currentEvent->vectorClock.push_back(thread->vectorClock[i]);
-//							cerr << "vectorClock " << i << " : " << currentEvent->vectorClock[i] << "\n";
+//							llvm::errs() << "vectorClock " << i << " : " << currentEvent->vectorClock[i] << "\n";
 						}
 					}
 					break;
@@ -368,13 +368,12 @@ namespace klee {
 
 //消息响应函数，在被测程序解释执行之后调用
 	void TaintListener::afterRunMethodAsMain(ExecutionState &state) {
-		cerr << "######################taint analysis####################\n";
 
 	}
 
 //消息相应函数，在前缀执行出错之后程序推出之前调用
 	void TaintListener::executionFailed(ExecutionState &state, KInstruction *ki) {
-		rdManager->getCurrentTrace()->traceType = Trace::FAILED;
+
 	}
 
 	ref<Expr> TaintListener::manualMakeTaintSymbolic(ExecutionState& state, std::string name, unsigned size) {
@@ -386,10 +385,10 @@ namespace klee {
 		ref<Expr> offset = ConstantExpr::create(0, BIT_WIDTH);
 		ref<Expr> result = os->read(offset, size);
 #if DEBUGSYMBOLIC
-		cerr << "Event name : " << currentEvent->eventName << "\n";
-		cerr << "make symboic:" << name << std::endl;
-		cerr << "isTaint:" << isTaint << std::endl;
-		std::cerr << "result : ";
+		llvm::errs() << "Event name : " << currentEvent->eventName << "\n";
+		llvm::errs() << "make symboic:" << name << "\n";
+		llvm::errs() << "isTaint:" << isTaint << "\n";
+		llvm::errs() << "result : ";
 		result->dump();
 #endif
 		return result;

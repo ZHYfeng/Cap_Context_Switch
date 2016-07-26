@@ -29,6 +29,8 @@
 #include <sys/time.h>
 #include <iterator>
 
+#define EVENTS_DEBUG 0
+
 namespace klee {
 
 	std::vector<ref<Expr> > arguments;
@@ -115,10 +117,10 @@ namespace klee {
 				}
 			}
 
-//			std::cerr << (*bit)->kind << "\n";
+//			llvm::errs() << (*bit)->kind << "\n";
 			for (llvm::Module::const_global_iterator i = m->global_begin(), e = m->global_end(); i != e; ++i) {
 				if (i->isDeclaration()) {
-//					std::cerr << "i->isDeclaration()\n";
+//					llvm::errs() << "i->isDeclaration()\n";
 					LLVM_TYPE_Q Type *ty = i->getType()->getElementType();
 					uint64_t size = executor->kmodule->targetData->getTypeStoreSize(ty);
 					MemoryObject *mo = executor->globalObjects.find(i)->second;
@@ -134,11 +136,11 @@ namespace klee {
 							os->write8(offset, ((unsigned char*) addr)[offset]);
 					}
 				} else {
-//					std::cerr << "!i->isDeclaration()\n";
+//					llvm::errs() << "!i->isDeclaration()\n";
 					MemoryObject *mo = executor->globalObjects.find(i)->second;
-//					std::cerr << "MemoryObject *mo = executor->globalObjects.find(i)->second;\n";
+//					llvm::errs() << "MemoryObject *mo = executor->globalObjects.find(i)->second;\n";
 					ObjectState *os = executor->bindObjectInState(state, mo, false);
-//					std::cerr << "ObjectState *os = executor->bindObjectInState(state, mo, false);\n";
+//					llvm::errs() << "ObjectState *os = executor->bindObjectInState(state, mo, false);\n";
 					if (!i->hasInitializer())
 						os->initializeToRandom();
 				}
@@ -160,9 +162,9 @@ namespace klee {
 
 	void ListenerService::beforeExecuteInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
 
-		std::cerr << "thread id : " << state.currentThread->threadId << "  ";
-		ki->inst->dump();
-		//		std::cerr << " before : " << std::endl;
+//		llvm::errs() << "thread id : " << state.currentThread->threadId << "  ";
+//		ki->inst->dump();
+		//		llvm::errs() << " before : " << std::endl;
 
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
 
@@ -191,16 +193,17 @@ namespace klee {
 					if (state.currentStack->realStack.size() <= 1) {
 
 					} else {
-//						std::cerr << " state.currentStack->popFrame();state.currentStack->popFrame(); : " << std::endl;
+//						llvm::errs() << " state.currentStack->popFrame();state.currentStack->popFrame(); : " << std::endl;
 						state.currentStack->popFrame();
-//						std::cerr << " state.currentStack->popFrame(); : " << std::endl;
+//						llvm::errs() << " state.currentStack->popFrame(); : " << std::endl;
 						if (!isVoidReturn) {
 							LLVM_TYPE_Q Type *t = caller->getType();
 							if (t != Type::getVoidTy(getGlobalContext())) {
 								Expr::Width from = result->getWidth();
 								Expr::Width to = executor->getWidthForLLVMType(t);
 								if (from != to) {
-									CallSite cs = (isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
+									CallSite cs = (
+											isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
 									bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
 									if (isSExt) {
 										result = SExtExpr::create(result, to);
@@ -231,7 +234,7 @@ namespace klee {
 					for (unsigned j = 0; j < numArgs; ++j) {
 						arguments.push_back(executor->eval(ki, j + 1, state).value);
 					}
-//					std::cerr << "arguments.reserve(numArgs);\n";
+//					llvm::errs() << "arguments.reserve(numArgs);\n";
 					if (f) {
 						const FunctionType *fType = dyn_cast<FunctionType>(cast<PointerType>(f->getType())->getElementType());
 						const FunctionType *fpType = dyn_cast<FunctionType>(cast<PointerType>(fp->getType())->getElementType());
@@ -343,7 +346,7 @@ namespace klee {
 
 	void ListenerService::afterExecuteInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
 
-//		std::cerr << " after : " << std::endl;
+//		llvm::errs() << " after : " << std::endl;
 
 		Instruction *i = ki->inst;
 
@@ -386,7 +389,7 @@ namespace klee {
 											ref<Expr> offset = mo->getOffsetExpr(address);
 											const ObjectState *os = op.second;
 											ref<Expr> threadID = os->read(offset, type);
-											llvm::errs() << "thread id : " << threadID << "\n";
+//											llvm::errs() << "thread id : " << threadID << "\n";
 											executor->executeMemoryOperation(state, true, address, threadID, 0);
 											executor->bindLocal(ki, state, ConstantExpr::create(0, Expr::Int32));
 
@@ -450,13 +453,13 @@ namespace klee {
 										size = executor->toUnique(state, size);
 										if (dyn_cast<ConstantExpr>(size)) {
 											ref<Expr> addr = state.currentThread->stack->realStack.back().locals[ki->dest].value;
-//											std::cerr << "calloc address : ";
+//											llvm::errs() << "calloc address : ";
 //											addr->dump();
 											ObjectPair op;
 											bool success = executor->getMemoryObject(op, state, state.currentThread->addressSpace, addr);
 											if (success) {
 												const MemoryObject *mo = op.first;
-//												std::cerr << "calloc address ; " << mo->address << " calloc size : " << mo->size << "\n";
+//												llvm::errs() << "calloc address ; " << mo->address << " calloc size : " << mo->size << "\n";
 												ObjectState *os = executor->bindObjectInState(state, mo, isLocal);
 												os->initializeToRandom();
 												executor->bindLocal(ki, state, mo->getBaseExpr());
@@ -505,13 +508,13 @@ namespace klee {
 				size = executor->toUnique(state, size);
 				if (dyn_cast<ConstantExpr>(size)) {
 					ref<Expr> addr = executor->getDestCell(state, ki).value;
-//					std::cerr << "alloc address : ";
+//					llvm::errs() << "alloc address : ";
 //					addr->dump();
 					ObjectPair op;
 					bool success = executor->getMemoryObject(op, state, state.currentThread->addressSpace, addr);
 					if (success) {
 						const MemoryObject *mo = op.first;
-//						std::cerr << "alloc address ; " << mo->address << " alloc size : " << mo->size << "\n";
+//						llvm::errs() << "alloc address ; " << mo->address << " alloc size : " << mo->size << "\n";
 						for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end();
 								bit != bie; ++bit) {
 							state.currentStack = (*bit)->stack[state.currentThread->threadId];
@@ -562,14 +565,7 @@ namespace klee {
 	}
 
 	void ListenerService::executionFailed(ExecutionState &state, KInstruction *ki) {
-		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
-
-			state.currentStack = (*bit)->stack[state.currentThread->threadId];
-
-			(*bit)->executionFailed(state, ki);
-
-			state.currentStack = state.currentThread->stack;
-		}
+		rdManager.getCurrentTrace()->traceType = Trace::FAILED;
 	}
 
 	void ListenerService::startControl(Executor* executor) {
@@ -580,8 +576,8 @@ namespace klee {
 		pushListener(PSOlistener);
 		BitcodeListener* Symboliclistener = new SymbolicListener(executor, &rdManager);
 		pushListener(Symboliclistener);
-//		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
-//		pushListener(Taintlistener);
+		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
+		pushListener(Taintlistener);
 
 		gettimeofday(&start, NULL);
 
@@ -589,43 +585,79 @@ namespace klee {
 
 	void ListenerService::endControl(Executor* executor) {
 
-		gettimeofday(&finish, NULL);
-		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-		rdManager.runningCost += cost;
+#if EVENTS_DEBUG
+		//true: output to file; false: output to terminal
+		rdManager.printCurrentTrace(true);
+		//			encode.showInitTrace();//need to be modified
+#endif
 
-		gettimeofday(&start, NULL);
-		encode = new Encode(&rdManager);
-		encode->buildifAndassert();
-		if (encode->verify()) {
-			encode->check_if();
+		if (executor->execStatus != Executor::SUCCESS) {
+			llvm::errs() << "######################执行有错误,放弃本次执行####################\n";
+			executor->isFinished = true;
+			return;
+		} else if (!rdManager.isCurrentTraceUntested()) {
+			rdManager.getCurrentTrace()->traceType = Trace::REDUNDANT;
+			llvm::errs() << "######################本条路径为旧路径####################\n";
+			executor->getNewPrefix();
+		} else {
+			llvm::errs() << "######################本条路径为新路径####################\n";
+			Trace* trace = rdManager.getCurrentTrace();
+			unsigned allGlobal = 0;
+			std::map<std::string, std::vector<Event *> > &writeSet = trace->writeSet;
+			std::map<std::string, std::vector<Event *> > &readSet = trace->readSet;
+			for (std::map<std::string, std::vector<Event *> >::iterator nit = readSet.begin(), nie = readSet.end(); nit != nie; ++nit) {
+				allGlobal += nit->second.size();
+			}
+			for (std::map<std::string, std::vector<Event *> >::iterator nit = writeSet.begin(), nie = writeSet.end(); nit != nie; ++nit) {
+				std::string varName = nit->first;
+				if (trace->readSet.find(varName) == trace->readSet.end()) {
+					allGlobal += nit->second.size();
+				}
+			}
+			rdManager.allGlobal += allGlobal;
+
+			gettimeofday(&finish, NULL);
+			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+			rdManager.runningCost += cost;
+
+			gettimeofday(&start, NULL);
+			encode = new Encode(&rdManager);
+			encode->buildifAndassert();
+			if (encode->verify()) {
+				encode->check_if();
+			}
+			gettimeofday(&finish, NULL);
+			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+			rdManager.solvingCost += cost;
+
+			gettimeofday(&start, NULL);
+			dtam = new DTAM(&rdManager);
+			dtam->dtam();
+			gettimeofday(&finish, NULL);
+			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+			rdManager.DTAMCost += cost;
+			rdManager.allDTAMCost.push_back(cost);
+
+			gettimeofday(&start, NULL);
+			encode->PTS();
+			gettimeofday(&finish, NULL);
+			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+			rdManager.PTSCost += cost;
+			rdManager.allPTSCost.push_back(cost);
+
+			delete encode;
+			delete dtam;
+
 		}
-		gettimeofday(&finish, NULL);
-		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-		rdManager.solvingCost += cost;
-
-//		gettimeofday(&start, NULL);
-//		dtam = new DTAM(&rdManager);
-//		dtam->dtam();
-//		gettimeofday(&finish, NULL);
-//		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-//		rdManager.DTAMCost += cost;
-//		rdManager.allDTAMCost.push_back(cost);
-//
-//		gettimeofday(&start, NULL);
-//		encode->PTS();
-//		gettimeofday(&finish, NULL);
-//		cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-//		rdManager.PTSCost += cost;
-//		rdManager.allPTSCost.push_back(cost);
 
 		executor->getNewPrefix();
 
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
 //			delete *bit;
 		}
-
-		delete encode;
-		delete dtam;
+		bitcodeListeners.pop_back();
+		bitcodeListeners.pop_back();
+//		bitcodeListeners.pop_back();
 
 	}
 

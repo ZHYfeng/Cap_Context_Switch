@@ -41,7 +41,7 @@
 #include "../../include/klee/util/Ref.h"
 #include "Prefix.h"
 
-#define FORMULA_DEBUG 1
+#define FORMULA_DEBUG 0
 #define BRANCH_INFO 1
 #define BUFFERSIZE 300
 #define BIT_WIDTH 64

@@ -68,7 +68,6 @@ ExecutionState::ExecutionState(KFunction *kf)
 	threadList.addThread(thread);
 	threadScheduler->addItem(thread);
 	currentThread = thread;
-	currentStack->pushFrame(0, kf);
 }
 
 ExecutionState::ExecutionState(KFunction *kf, Prefix* prefix)
@@ -90,7 +89,6 @@ ExecutionState::ExecutionState(KFunction *kf, Prefix* prefix)
 	threadList.addThread(thread);
 	threadScheduler->addItem(thread);
 	currentThread = thread;
-	currentStack->pushFrame(0, kf);
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
