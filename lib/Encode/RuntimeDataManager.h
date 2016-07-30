@@ -31,28 +31,31 @@ class RuntimeDataManager {
 
 	public:
 		unsigned allFormulaNum;
+		unsigned solvingTimes;
 		unsigned allGlobal;
 		unsigned brGlobal;
-		unsigned solvingTimes;
 		unsigned satBranch;
-		unsigned unSatBranch;
-		unsigned uunSatBranch;
+		unsigned unSatBranchBySolve;
+		unsigned unSatBranchByPreSolve;
+
 		double runningCost;
 		double solvingCost;
 		double satCost;
 		double unSatCost;
 
-		double TaintCost;
-		double PTSCost;
 		double DTAMCost;
+		double DTAMSerialCost;
 		double DTAMParallelCost;
 		double DTAMhybridCost;
+		double PTSCost;
 
-		std::vector<double> allTaintCost;
-		std::vector<double> allPTSCost;
+
+
 		std::vector<double> allDTAMCost;
+		std::vector<double> allDTAMSerialCost;
 		std::vector<double> allDTAMParallelCost;
 		std::vector<double> allDTAMhybridCost;
+		std::vector<double> allPTSCost;
 
 		std::vector<unsigned> DTAMSerial;
 		std::vector<unsigned> DTAMParallel;
@@ -65,12 +68,12 @@ class RuntimeDataManager {
 		std::vector<unsigned> DTAMSerialMap;
 		std::vector<unsigned> DTAMParallelMap;
 		std::vector<unsigned> DTAMhybridMap;
-		std::vector<unsigned> TaintMap;
+		std::vector<unsigned> TaintAndPTSMap;
 
-		std::set<std::string> allTaintMap;
 		std::set<std::string> allDTAMSerialMap;
 		std::set<std::string> allDTAMParallelMap;
 		std::set<std::string> allDTAMhybridMap;
+		std::set<std::string> allTaintMap;
 
 		RuntimeDataManager();
 		virtual ~RuntimeDataManager();

@@ -37,6 +37,8 @@ class BitcodeListener {
 		AddressSpace addressSpace;
 		std::map<unsigned, StackType*> stack;
 
+		std::vector<ref<Expr> > arguments;
+
 		virtual void beforeRunMethodAsMain(ExecutionState &state) = 0;
 		virtual void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki) = 0;
 		virtual void afterExecuteInstruction(ExecutionState &state, KInstruction *ki) = 0;

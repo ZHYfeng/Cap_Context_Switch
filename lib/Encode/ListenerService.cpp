@@ -33,8 +33,6 @@
 
 namespace klee {
 
-	std::vector<ref<Expr> > arguments;
-
 	ListenerService::ListenerService(Executor* executor) {
 		encode = NULL;
 		dtam = NULL;
@@ -162,9 +160,9 @@ namespace klee {
 
 	void ListenerService::beforeExecuteInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
 
-//		llvm::errs() << "thread id : " << state.currentThread->threadId << "  ";
-//		ki->inst->dump();
-		//		llvm::errs() << " before : " << std::endl;
+		llvm::errs() << "thread id : " << state.currentThread->threadId << "  ";
+		ki->inst->dump();
+		//		llvm::errs() << " before : " << "\n";
 
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
 
@@ -179,44 +177,6 @@ namespace klee {
 
 		switch (i->getOpcode()) {
 			case Instruction::Ret: {
-				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie;
-						++bit) {
-					state.currentStack = (*bit)->stack[state.currentThread->threadId];
-					ReturnInst *ri = cast<ReturnInst>(i);
-					KInstIterator kcaller = state.currentStack->realStack.back().caller;
-					Instruction *caller = kcaller ? kcaller->inst : 0;
-					bool isVoidReturn = (ri->getNumOperands() == 0);
-					ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
-					if (!isVoidReturn) {
-						result = executor->eval(ki, 0, state).value;
-					}
-					if (state.currentStack->realStack.size() <= 1) {
-
-					} else {
-//						llvm::errs() << " state.currentStack->popFrame();state.currentStack->popFrame(); : " << std::endl;
-						state.currentStack->popFrame();
-//						llvm::errs() << " state.currentStack->popFrame(); : " << std::endl;
-						if (!isVoidReturn) {
-							LLVM_TYPE_Q Type *t = caller->getType();
-							if (t != Type::getVoidTy(getGlobalContext())) {
-								Expr::Width from = result->getWidth();
-								Expr::Width to = executor->getWidthForLLVMType(t);
-								if (from != to) {
-									CallSite cs = (
-											isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
-									bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
-									if (isSExt) {
-										result = SExtExpr::create(result, to);
-									} else {
-										result = ZExtExpr::create(result, to);
-									}
-								}
-								executor->bindLocal(kcaller, state, result);
-							}
-						}
-						state.currentStack = state.currentThread->stack;
-					}
-				}
 				break;
 			}
 
@@ -230,9 +190,9 @@ namespace klee {
 					unsigned numArgs = cs.arg_size();
 					Value *fp = cs.getCalledValue();
 					Function *f = executor->getTargetFunction(fp, state);
-					arguments.reserve(numArgs);
+					(*bit)->arguments.reserve(numArgs);
 					for (unsigned j = 0; j < numArgs; ++j) {
-						arguments.push_back(executor->eval(ki, j + 1, state).value);
+						(*bit)->arguments.push_back(executor->eval(ki, j + 1, state).value);
 					}
 //					llvm::errs() << "arguments.reserve(numArgs);\n";
 					if (f) {
@@ -240,16 +200,16 @@ namespace klee {
 						const FunctionType *fpType = dyn_cast<FunctionType>(cast<PointerType>(fp->getType())->getElementType());
 						if (fType != fpType) {
 							unsigned i = 0;
-							for (std::vector<ref<Expr> >::iterator ai = arguments.begin(), ie = arguments.end(); ai != ie; ++ai) {
+							for (std::vector<ref<Expr> >::iterator ai = (*bit)->arguments.begin(), ie = (*bit)->arguments.end(); ai != ie; ++ai) {
 								Expr::Width to, from = (*ai)->getWidth();
 								if (i < fType->getNumParams()) {
 									to = executor->getWidthForLLVMType(fType->getParamType(i));
 									if (from != to) {
 										bool isSExt = cs.paramHasAttr(i + 1, llvm::Attribute::SExt);
 										if (isSExt) {
-											arguments[i] = SExtExpr::create(arguments[i], to);
+											(*bit)->arguments[i] = SExtExpr::create((*bit)->arguments[i], to);
 										} else {
-											arguments[i] = ZExtExpr::create(arguments[i], to);
+											(*bit)->arguments[i] = ZExtExpr::create((*bit)->arguments[i], to);
 										}
 									}
 								}
@@ -265,16 +225,16 @@ namespace klee {
 									StackFrame &sf = state.currentStack->realStack.back();
 									Expr::Width WordSize = Context::get().getPointerWidth();
 									if (WordSize == Expr::Int32) {
-										executor->executeMemoryOperation(state, true, arguments[0], sf.varargs->getBaseExpr(), 0);
+										executor->executeMemoryOperation(state, true, (*bit)->arguments[0], sf.varargs->getBaseExpr(), 0);
 									} else {
-										executor->executeMemoryOperation(state, true, arguments[0], ConstantExpr::create(48, 32), 0); // gp_offset
+										executor->executeMemoryOperation(state, true, (*bit)->arguments[0], ConstantExpr::create(48, 32), 0); // gp_offset
 										executor->executeMemoryOperation(state, true,
-												AddExpr::create(arguments[0], ConstantExpr::create(4, 64)), ConstantExpr::create(304, 32),
+												AddExpr::create((*bit)->arguments[0], ConstantExpr::create(4, 64)), ConstantExpr::create(304, 32),
 												0); // fp_offset
 										executor->executeMemoryOperation(state, true,
-												AddExpr::create(arguments[0], ConstantExpr::create(8, 64)), sf.varargs->getBaseExpr(), 0); // overflow_arg_area
+												AddExpr::create((*bit)->arguments[0], ConstantExpr::create(8, 64)), sf.varargs->getBaseExpr(), 0); // overflow_arg_area
 										executor->executeMemoryOperation(state, true,
-												AddExpr::create(arguments[0], ConstantExpr::create(16, 64)), ConstantExpr::create(0, 64),
+												AddExpr::create((*bit)->arguments[0], ConstantExpr::create(16, 64)), ConstantExpr::create(0, 64),
 												0); // reg_save_area
 									}
 									break;
@@ -283,35 +243,7 @@ namespace klee {
 									break;
 							}
 						} else {
-							KFunction *kf = executor->kmodule->functionMap[f];
-							state.currentStack->pushFrame(state.currentThread->prevPC, kf);
-							state.currentThread->pc = kf->instructions;
-							unsigned callingArgs = arguments.size();
-							unsigned funcArgs = f->arg_size();
-							if (f->isVarArg()) {
-								Expr::Width WordSize = Context::get().getPointerWidth();
-								StackFrame &sf = state.currentStack->realStack.back();
-								MemoryObject *mo = sf.varargs = state.currentThread->stack->realStack.back().varargs;
-								ObjectState *os = executor->bindObjectInState(state, mo, true);
-								unsigned offset = 0;
-								for (unsigned i = funcArgs; i < callingArgs; i++) {
-									if (WordSize == Expr::Int32) {
-										os->write(offset, arguments[i]);
-										offset += Expr::getMinBytesForWidth(arguments[i]->getWidth());
-									} else {
-										Expr::Width argWidth = arguments[i]->getWidth();
-										if (argWidth > Expr::Int64) {
-											offset = llvm::RoundUpToAlignment(offset, 16);
-										}
-										os->write(offset, arguments[i]);
-										offset += llvm::RoundUpToAlignment(argWidth, WordSize) / 8;
-									}
-								}
-							}
-							unsigned numFormals = f->arg_size();
-							for (unsigned i = 0; i < numFormals; ++i) {
-								executor->bindArgument(kf, i, state, arguments[i]);
-							}
+
 						}
 					} else {
 						assert(0 && "listenerSercive execute call");
@@ -346,12 +278,51 @@ namespace klee {
 
 	void ListenerService::afterExecuteInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
 
-//		llvm::errs() << " after : " << std::endl;
+//		llvm::errs() << " after : " << "\n";
 
 		Instruction *i = ki->inst;
 
 		switch (i->getOpcode()) {
+
 			case Instruction::Ret: {
+				for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie;
+						++bit) {
+					state.currentStack = (*bit)->stack[state.currentThread->threadId];
+					ReturnInst *ri = cast<ReturnInst>(i);
+					KInstIterator kcaller = state.currentStack->realStack.back().caller;
+					Instruction *caller = kcaller ? kcaller->inst : 0;
+					bool isVoidReturn = (ri->getNumOperands() == 0);
+					ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
+					if (!isVoidReturn) {
+						result = executor->eval(ki, 0, state).value;
+					}
+					if (state.currentStack->realStack.size() <= 1) {
+
+					} else {
+//						llvm::errs() << " state.currentStack->popFrame();state.currentStack->popFrame(); : " << "\n";
+						state.currentStack->popFrame();
+//						llvm::errs() << " state.currentStack->popFrame(); : " << "\n";
+						if (!isVoidReturn) {
+							LLVM_TYPE_Q Type *t = caller->getType();
+							if (t != Type::getVoidTy(getGlobalContext())) {
+								Expr::Width from = result->getWidth();
+								Expr::Width to = executor->getWidthForLLVMType(t);
+								if (from != to) {
+									CallSite cs = (
+											isa<InvokeInst>(caller) ? CallSite(cast<InvokeInst>(caller)) : CallSite(cast<CallInst>(caller)));
+									bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
+									if (isSExt) {
+										result = SExtExpr::create(result, to);
+									} else {
+										result = ZExtExpr::create(result, to);
+									}
+								}
+								executor->bindLocal(kcaller, state, result);
+							}
+						}
+						state.currentStack = state.currentThread->stack;
+					}
+				}
 				break;
 			}
 
@@ -381,7 +352,7 @@ namespace klee {
 										PointerType* pointerType = (PointerType*) (calli->getArgOperand(0)->getType());
 										IntegerType* elementType = (IntegerType*) (pointerType->getElementType());
 										Expr::Width type = elementType->getBitWidth();
-										ref<Expr> address = arguments[0];
+										ref<Expr> address = (*bit)->arguments[0];
 										ObjectPair op;
 										bool success = executor->getMemoryObject(op, state, state.currentThread->addressSpace, address);
 										if (success) {
@@ -398,14 +369,15 @@ namespace klee {
 											stack->realStack.reserve(10);
 											stack->pushFrame(0, kthreadEntrance);
 											state.currentStack = stack;
-											executor->bindArgument(kthreadEntrance, 0, state, arguments[3]);
+											executor->bindArgument(kthreadEntrance, 0, state, (*bit)->arguments[3]);
+											llvm::errs() << "(*bit)->arguments[3] : " << (*bit)->arguments[3] << "\n";
 											state.currentStack = (*bit)->stack[state.currentThread->threadId];
 										}
 
 									} else if (f->getName().str() == "malloc" || f->getName().str() == "_ZdaPv"
 											|| f->getName().str() == "_Znaj" || f->getName().str() == "_Znam"
 											|| f->getName().str() == "valloc") {
-										ref<Expr> size = arguments[0];
+										ref<Expr> size = (*bit)->arguments[0];
 										bool isLocal = false;
 										size = executor->toUnique(state, size);
 										if (dyn_cast<ConstantExpr>(size)) {
@@ -414,6 +386,7 @@ namespace klee {
 											bool success = executor->getMemoryObject(op, state, state.currentThread->addressSpace, addr);
 											if (success) {
 												const MemoryObject *mo = op.first;
+												llvm::errs() << "mo address : " << mo->address << " mo size : " << mo->size << "\n";
 												ObjectState *os = executor->bindObjectInState(state, mo, isLocal);
 												os->initializeToRandom();
 												executor->bindLocal(ki, state, mo->getBaseExpr());
@@ -423,7 +396,8 @@ namespace klee {
 										}
 									} else if (f->getName().str() == "_ZdlPv" || f->getName().str() == "_Znwj"
 											|| f->getName().str() == "_Znwm" || f->getName().str() == "free") {
-										ref<Expr> address = arguments[0];
+										ref<Expr> address = (*bit)->arguments[0];
+//										llvm::errs() << "address : " << address << "\n";
 										Executor::StatePair zeroPointer = executor->fork(state, Expr::createIsZero(address), true);
 										if (zeroPointer.first) {
 											if (ki)
@@ -448,7 +422,7 @@ namespace klee {
 											}
 										}
 									} else if (f->getName().str() == "calloc") {
-										ref<Expr> size = MulExpr::create(arguments[0], arguments[1]);
+										ref<Expr> size = MulExpr::create((*bit)->arguments[0], (*bit)->arguments[1]);
 										bool isLocal = false;
 										size = executor->toUnique(state, size);
 										if (dyn_cast<ConstantExpr>(size)) {
@@ -470,6 +444,7 @@ namespace klee {
 									} else if (f->getName().str() == "realloc") {
 										assert(0 && "realloc");
 									} else {
+//										(*bit)->addressSpace.copyInConcretes();
 										LLVM_TYPE_Q Type *resultType = ki->inst->getType();
 										if (resultType != Type::getVoidTy(getGlobalContext())) {
 											ref<Expr> e = state.currentThread->stack->realStack.back().locals[ki->dest].value;
@@ -484,12 +459,39 @@ namespace klee {
 									break;
 							}
 						} else {
-
+							KFunction *kf = executor->kmodule->functionMap[f];
+							state.currentStack->pushFrame(state.currentThread->prevPC, kf);
+							unsigned callingArgs = (*bit)->arguments.size();
+							unsigned funcArgs = f->arg_size();
+							if (f->isVarArg()) {
+								Expr::Width WordSize = Context::get().getPointerWidth();
+								StackFrame &sf = state.currentStack->realStack.back();
+								MemoryObject *mo = sf.varargs = state.currentThread->stack->realStack.back().varargs;
+								ObjectState *os = executor->bindObjectInState(state, mo, true);
+								unsigned offset = 0;
+								for (unsigned i = funcArgs; i < callingArgs; i++) {
+									if (WordSize == Expr::Int32) {
+										os->write(offset, (*bit)->arguments[i]);
+										offset += Expr::getMinBytesForWidth((*bit)->arguments[i]->getWidth());
+									} else {
+										Expr::Width argWidth = (*bit)->arguments[i]->getWidth();
+										if (argWidth > Expr::Int64) {
+											offset = llvm::RoundUpToAlignment(offset, 16);
+										}
+										os->write(offset, (*bit)->arguments[i]);
+										offset += llvm::RoundUpToAlignment(argWidth, WordSize) / 8;
+									}
+								}
+							}
+							unsigned numFormals = f->arg_size();
+							for (unsigned i = 0; i < numFormals; ++i) {
+								executor->bindArgument(kf, i, state, (*bit)->arguments[i]);
+							}
 						}
 					} else {
 						assert(0 && "listenerSercive execute call");
 					}
-					arguments.clear();
+					(*bit)->arguments.clear();
 					state.currentStack = state.currentThread->stack;
 				}
 				break;
@@ -579,6 +581,18 @@ namespace klee {
 		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
 		pushListener(Taintlistener);
 
+		unsigned traceNum = executor->executionNum;
+		llvm::errs() << "\n";
+		llvm::errs() << "************************************************************************\n";
+		llvm::errs() << "第" << traceNum << "次执行,路径文件为trace" << traceNum << ".txt";
+		if (traceNum == 1) {
+			llvm::errs() << " 初始执行" << "\n";
+		} else {
+			llvm::errs() << " 前缀执行,前缀文件为prefix" << executor->prefix->getName() << ".txt" << "\n";
+		}
+		llvm::errs() << "************************************************************************\n";
+		llvm::errs() << "\n";
+
 		gettimeofday(&start, NULL);
 
 	}
@@ -592,16 +606,17 @@ namespace klee {
 #endif
 
 		if (executor->execStatus != Executor::SUCCESS) {
-			llvm::errs() << "######################执行有错误,放弃本次执行####################\n";
+			llvm::errs() << "######################执行有错误,放弃本次执行##############\n";
 			executor->isFinished = true;
 			return;
 		} else if (!rdManager.isCurrentTraceUntested()) {
 			rdManager.getCurrentTrace()->traceType = Trace::REDUNDANT;
 			llvm::errs() << "######################本条路径为旧路径####################\n";
-			executor->getNewPrefix();
 		} else {
 			llvm::errs() << "######################本条路径为新路径####################\n";
+			rdManager.getCurrentTrace()->traceType = Trace::UNIQUE;
 			Trace* trace = rdManager.getCurrentTrace();
+
 			unsigned allGlobal = 0;
 			std::map<std::string, std::vector<Event *> > &writeSet = trace->writeSet;
 			std::map<std::string, std::vector<Event *> > &readSet = trace->readSet;
@@ -619,6 +634,7 @@ namespace klee {
 			gettimeofday(&finish, NULL);
 			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
 			rdManager.runningCost += cost;
+			rdManager.allDTAMSerialCost.push_back(cost);
 
 			gettimeofday(&start, NULL);
 			encode = new Encode(&rdManager);
@@ -657,7 +673,7 @@ namespace klee {
 		}
 		bitcodeListeners.pop_back();
 		bitcodeListeners.pop_back();
-//		bitcodeListeners.pop_back();
+		bitcodeListeners.pop_back();
 
 	}
 

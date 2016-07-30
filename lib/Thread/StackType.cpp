@@ -48,8 +48,9 @@ namespace klee {
 
 	void StackType::popFrame() {
 		StackFrame &sf = realStack.back();
-		for (std::vector<const MemoryObject*>::iterator it = sf.allocas.begin(), ie = sf.allocas.end(); it != ie; ++it)
+		for (std::vector<const MemoryObject*>::iterator it = sf.allocas.begin(), ie = sf.allocas.end(); it != ie; ++it) {
 			addressSpace->unbindObject(*it);
+		}
 		realStack.pop_back();
 	}
 

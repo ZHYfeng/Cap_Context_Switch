@@ -302,7 +302,8 @@ void AddressSpace::copyOutConcretes() {
     if (!mo->isUserSpecified) {
       ObjectState *os = it->second;
       uint8_t *address = (uint8_t*) (unsigned long) mo->address;
-
+//      llvm::errs() << "copyOutConcretes address : " << mo->address <<"\n";
+//      llvm::errs() << "os->concreteStore : " << (unsigned long)os->concreteStore << "\n";
       if (!os->readOnly)
         memcpy(address, os->concreteStore, mo->size);
     }
@@ -317,7 +318,8 @@ bool AddressSpace::copyInConcretes() {
     if (!mo->isUserSpecified) {
       const ObjectState *os = it->second;
       uint8_t *address = (uint8_t*) (unsigned long) mo->address;
-
+//      llvm::errs() << "copyInConcretes address : " << mo->address <<"\n";
+//      llvm::errs() << "os->concreteStore : " << (unsigned long)os->concreteStore << "\n";
       if (memcmp(address, os->concreteStore, mo->size)!=0) {
         if (os->readOnly) {
           return false;

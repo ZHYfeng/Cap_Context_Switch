@@ -69,17 +69,6 @@ namespace klee {
 			}
 		}
 
-		unsigned traceNum = executor->executionNum;
-		llvm::errs() << "\n";
-		llvm::errs() << "************************************************************************\n";
-		llvm::errs() << "第" << traceNum << "次执行,路径文件为trace" << traceNum << ".txt";
-		if (traceNum == 1) {
-			llvm::errs() << " 初始执行" << "\n";
-		} else {
-			llvm::errs() << " 前缀执行,前缀文件为prefix" << executor->prefix->getName() << ".txt" << "\n";
-		}
-		llvm::errs() << "************************************************************************\n";
-		llvm::errs() << "\n";
 	}
 
 //指令调用消息响应函数，在指令解释执行前被调用
@@ -360,10 +349,14 @@ namespace klee {
 					item->eventType = Event::IGNORE;
 				} else {
 					ref<Expr> address = executor->eval(ki, 0, state).value;
+					ref<Expr> addressCurrent = executor->evalCurrent(ki, 0, state).value;
+					llvm::errs() << "address : " << address << " address Current : " << addressCurrent << "\n";
+					ObjectPair op;
+					bool successCurrent = executor->getMemoryObject(op, state, state.currentThread->addressSpace, addressCurrent);
+					llvm::errs() << "successCurrent : " << successCurrent << "\n";
 					ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address);
 					if (realAddress) {
 						uint64_t key = realAddress->getZExtValue();
-						ObjectPair op;
 						bool success = executor->getMemoryObject(op, state, state.currentStack->addressSpace, address);
 						if (success) {
 							const MemoryObject *mo = op.first;
@@ -524,7 +517,6 @@ namespace klee {
 
 //消息相应函数，在前缀执行出错之后程序推出之前调用
 	void PSOListener::executionFailed(ExecutionState &state, KInstruction *ki) {
-		rdManager->getCurrentTrace()->traceType = Trace::FAILED;
 	}
 
 //处理全局函数初始值

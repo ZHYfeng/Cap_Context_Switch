@@ -215,6 +215,7 @@ namespace klee {
 		}
 		if (!eventList[threadId]) {
 			eventList[threadId] = new vector<Event*>();
+//			std::cerr << "create eventList id : " << threadId << "\n";
 		}
 		eventList[threadId]->push_back(event);
 		event->threadEventId = eventList[threadId]->size();
@@ -476,7 +477,7 @@ namespace klee {
 //}
 
 	void Trace::createAbstract() {
-//	cerr << "createAbstract\n" ;
+//	std::cerr << "createAbstract\n" ;
 		for (unsigned tid = 0; tid < this->eventList.size(); tid++) {
 			std::vector<Event*>* thread = this->eventList[tid];
 			if (thread == NULL) //A bug introduced by lcyu
@@ -484,11 +485,11 @@ namespace klee {
 			stringstream ss;
 			string fn = thread->at(0)->inst->inst->getParent()->getParent()->getName().data();
 			ss << fn << ":";
-//		cerr << fn << "\n";
+//		std::cerr << fn << "\n";
 			for (unsigned i = 0; i < thread->size(); i++) {
 				Event* event = thread->at(i);
 				if (event->isConditionInst) {
-//				cerr << "condition : " << event->condition << " ";
+//				std::cerr << "condition : " << event->condition << " ";
 //				event->inst->inst->dump();
 					ss << event->brCondition;
 				}

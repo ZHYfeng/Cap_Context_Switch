@@ -55,7 +55,9 @@ ObjectHolder::ObjectHolder(ObjectState *_os) : os(_os) {
 }
 
 ObjectHolder::~ObjectHolder() { 
-  if (os && --os->refCount==0) delete os; 
+  if (os && --os->refCount==0) {
+	  delete os;
+  }
 }
   
 ObjectHolder &ObjectHolder::operator=(const ObjectHolder &b) {
@@ -176,20 +178,22 @@ ObjectState::ObjectState(const ObjectState &os)
 }
 
 ObjectState::~ObjectState() {
-  if (concreteMask) delete concreteMask;
-  if (flushMask) delete flushMask;
-  if (knownSymbolics) delete[] knownSymbolics;
-  delete[] concreteStore;
 
-  if (object)
-  {
-    assert(object->refCount > 0);
-    object->refCount--;
-    if (object->refCount == 0)
-    {
-      delete object;
-    }
-  }
+	if (concreteMask)
+		delete concreteMask;
+	if (flushMask)
+		delete flushMask;
+	if (knownSymbolics)
+		delete[] knownSymbolics;
+	delete[] concreteStore;
+
+	if (object) {
+		assert(object->refCount > 0);
+		object->refCount--;
+		if (object->refCount == 0) {
+			delete object;
+		}
+	}
 }
 
 ArrayCache *ObjectState::getArrayCache() const {
