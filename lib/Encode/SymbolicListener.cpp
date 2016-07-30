@@ -33,10 +33,6 @@
 using namespace std;
 using namespace llvm;
 
-#define PTR 1
-#define DEBUGSYMBOLIC 0
-#define BIT_WIDTH 64
-
 namespace klee {
 
 	SymbolicListener::SymbolicListener(Executor* executor, RuntimeDataManager* rdManager) :

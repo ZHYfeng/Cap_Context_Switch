@@ -31,10 +31,6 @@
 using namespace std;
 using namespace llvm;
 
-#define PTR 0
-#define DEBUGSTRCPY 0
-#define COND_DEBUG 0
-
 namespace klee {
 
 	PSOListener::PSOListener(Executor* executor, RuntimeDataManager* rdManager) :
@@ -179,7 +175,7 @@ namespace klee {
 					} else {
 						assert(0 && "cond not exist");
 					}
-#if COND_DEBUG
+#if DEBUG_RUNTIME
 					ki->inst->dump();
 					llvm::errs() << "event name : " << item->eventName << "\n";
 					llvm::errs() << "wait : " << item->condName << "\n";
@@ -195,7 +191,7 @@ namespace klee {
 					} else {
 						assert(0 && "cond not exist");
 					}
-#if COND_DEBUG
+#if DEBUG_RUNTIME
 					ki->inst->dump();
 					llvm::errs() << "event name : " << item->eventName << "\n";
 					llvm::errs() << "signal  : " << item->condName << "\n";
@@ -211,7 +207,7 @@ namespace klee {
 					} else {
 						assert(0 && "cond not exist");
 					}
-#if COND_DEBUG
+#if DEBUG_RUNTIME
 					ki->inst->dump();
 					llvm::errs() << "event name : " << item->eventName << "\n";
 					llvm::errs() << "broadcast cond  : " << item->condName << "\n";
@@ -349,11 +345,13 @@ namespace klee {
 					item->eventType = Event::IGNORE;
 				} else {
 					ref<Expr> address = executor->eval(ki, 0, state).value;
+					ObjectPair op;
+#if DEBUG_RUNTIME
 					ref<Expr> addressCurrent = executor->evalCurrent(ki, 0, state).value;
 					llvm::errs() << "address : " << address << " address Current : " << addressCurrent << "\n";
-					ObjectPair op;
 					bool successCurrent = executor->getMemoryObject(op, state, state.currentThread->addressSpace, addressCurrent);
 					llvm::errs() << "successCurrent : " << successCurrent << "\n";
+#endif
 					ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address);
 					if (realAddress) {
 						uint64_t key = realAddress->getZExtValue();

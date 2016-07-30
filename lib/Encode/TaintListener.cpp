@@ -38,10 +38,6 @@
 using namespace std;
 using namespace llvm;
 
-#define PTR 1
-#define BIT_WIDTH 64
-#define POINT_BIT_WIDTH 64
-
 namespace klee {
 
 	TaintListener::TaintListener(Executor* executor, RuntimeDataManager* rdManager) :

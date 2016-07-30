@@ -13,6 +13,10 @@
 #include "../Encode/RuntimeDataManager.h"
 #include "../Thread/StackType.h"
 
+#define PTR 0
+#define DEBUG_RUNTIME 0
+#define BIT_WIDTH 64
+
 namespace klee {
 
 class BitcodeListener {

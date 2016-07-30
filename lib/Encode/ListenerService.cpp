@@ -29,8 +29,6 @@
 #include <sys/time.h>
 #include <iterator>
 
-#define EVENTS_DEBUG 0
-
 namespace klee {
 
 	ListenerService::ListenerService(Executor* executor) {
@@ -160,9 +158,11 @@ namespace klee {
 
 	void ListenerService::beforeExecuteInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
 
+#if DEBUG_RUNTIME
 		llvm::errs() << "thread id : " << state.currentThread->threadId << "  ";
 		ki->inst->dump();
 		//		llvm::errs() << " before : " << "\n";
+#endif
 
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
 
@@ -370,7 +370,9 @@ namespace klee {
 											stack->pushFrame(0, kthreadEntrance);
 											state.currentStack = stack;
 											executor->bindArgument(kthreadEntrance, 0, state, (*bit)->arguments[3]);
+#if DEBUG_RUNTIME
 											llvm::errs() << "(*bit)->arguments[3] : " << (*bit)->arguments[3] << "\n";
+#endif
 											state.currentStack = (*bit)->stack[state.currentThread->threadId];
 										}
 
@@ -386,7 +388,9 @@ namespace klee {
 											bool success = executor->getMemoryObject(op, state, state.currentThread->addressSpace, addr);
 											if (success) {
 												const MemoryObject *mo = op.first;
+#if DEBUG_RUNTIME
 												llvm::errs() << "mo address : " << mo->address << " mo size : " << mo->size << "\n";
+#endif
 												ObjectState *os = executor->bindObjectInState(state, mo, isLocal);
 												os->initializeToRandom();
 												executor->bindLocal(ki, state, mo->getBaseExpr());
@@ -599,7 +603,7 @@ namespace klee {
 
 	void ListenerService::endControl(Executor* executor) {
 
-#if EVENTS_DEBUG
+#if DEBUG_RUNTIME
 		//true: output to file; false: output to terminal
 		rdManager.printCurrentTrace(true);
 		//			encode.showInitTrace();//need to be modified

@@ -251,15 +251,16 @@ namespace klee {
 		std::map<std::string, std::set<std::string>*> &varRelatedSymbolicExpr = trace->allRelatedSymbolicExpr;
 		for (std::set<std::string>::iterator nit = allRelatedSymbolicExpr.begin(); nit != allRelatedSymbolicExpr.end(); ++nit) {
 			name = *nit;
+			llvm::errs() << "allRelatedSymbolicExpr name : " << name << "\n";
 			std::vector<ref<Expr> >::iterator itt = remainingExpr.begin();
 			for (std::vector<std::string>::iterator it = remainingExprName.begin(), ie = remainingExprName.end(); it != ie;) {
 				if (name == *it) {
 					remainingExprName.erase(it);
 					--ie;
 					pathCondition.push_back(*itt);
-
+					llvm::errs() << *itt << "\n";
 					std::set<std::string> *tempSymbolicExpr = new std::set<std::string>;
-					resolveSymbolicExpr(itt->get(), *tempSymbolicExpr);
+					resolveSymbolicExpr(*itt, *tempSymbolicExpr);
 					if (varRelatedSymbolicExpr.find(name) != varRelatedSymbolicExpr.end()) {
 						addExprToSet(tempSymbolicExpr, varRelatedSymbolicExpr[name]);
 					} else {
@@ -272,6 +273,11 @@ namespace klee {
 					++itt;
 				}
 			}
+		}
+
+		llvm::errs() << "allRelatedSymbolicExpr" << "\n";
+		for (std::set<std::string>::iterator nit = allRelatedSymbolicExpr.begin(); nit != allRelatedSymbolicExpr.end(); ++nit) {
+			llvm::errs() << (*nit).c_str() << "\n";
 		}
 
 		std::map<std::string, long> &varThread = trace->varThread;
@@ -342,10 +348,10 @@ namespace klee {
 
 		std::map<std::string, llvm::Constant*> usefulGlobal_variable_initializer;
 		std::map<std::string, llvm::Constant*> &global_variable_initializer = trace->global_variable_initializer;
-//		std::cerr << "global_variable_initializer = " << trace->global_variable_initializer.size() << std::endl;
+//		llvm::errs() << "global_variable_initializer = " << trace->global_variable_initializer.size() << std::endl;
 //		for (std::map<std::string, llvm::Constant*>::iterator it = trace->global_variable_initializer.begin(), ie =
 //				trace->global_variable_initializer.end(); it != ie; ++it) {
-//			std::cerr << it->first << std::endl;
+//			llvm::errs() << it->first << std::endl;
 //		}
 		usefulGlobal_variable_initializer.clear();
 		for (std::map<std::string, llvm::Constant*>::iterator nit = global_variable_initializer.begin(), nie =
@@ -360,10 +366,10 @@ namespace klee {
 				usefulGlobal_variable_initializer.end(); nit != nie; ++nit) {
 			global_variable_initializer.insert(*nit);
 		}
-//		std::cerr << "global_variable_initializer = " << trace->global_variable_initializer.size() << std::endl;
+//		llvm::errs() << "global_variable_initializer = " << trace->global_variable_initializer.size() << std::endl;
 //		for (std::map<std::string, llvm::Constant*>::iterator it = trace->global_variable_initializer.begin(), ie =
 //				trace->global_variable_initializer.end(); it != ie; ++it) {
-//			std::cerr << it->first << std::endl;
+//			llvm::errs() << it->first << std::endl;
 //		}
 //
 //		std::vector<std::vector<Event*>*> eventList = trace->eventList;

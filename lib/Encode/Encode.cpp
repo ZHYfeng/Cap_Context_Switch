@@ -958,8 +958,7 @@ namespace klee {
 
 	void Encode::buildifAndassert() {
 		Trace* trace = runtimeData->getCurrentTrace();
-		filter.filterUseless(trace);
-#if FORMULA_DEBUG
+#if FILTER_DEBUG
 		std::cerr << "all constraint :" << std::endl;
 		std::cerr << "storeSymbolicExpr = " << trace->storeSymbolicExpr.size() << std::endl;
 		for (std::vector<ref<Expr> >::iterator it = trace->storeSymbolicExpr.begin(), ie = trace->storeSymbolicExpr.end(); it != ie; ++it) {
@@ -970,9 +969,16 @@ namespace klee {
 			it->get()->dump();
 		}
 		std::cerr << "assertSymbolicExpr = " << trace->assertSymbolicExpr.size() << std::endl;
-
 		for (std::vector<ref<Expr> >::iterator it = trace->assertSymbolicExpr.begin(), ie = trace->assertSymbolicExpr.end(); it != ie;
 				++it) {
+			it->get()->dump();
+		}
+#endif
+		filter.filterUseless(trace);
+#if FILTER_DEBUG
+		std::cerr << "all constraint :" << std::endl;
+		std::cerr << "pathCondition = " << trace->pathCondition.size() << std::endl;
+		for (std::vector<ref<Expr> >::iterator it = trace->pathCondition.begin(), ie = trace->pathCondition.end(); it != ie; ++it) {
 			it->get()->dump();
 		}
 #endif

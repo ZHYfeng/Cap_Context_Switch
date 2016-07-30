@@ -1830,15 +1830,19 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
 		case Instruction::Load: {
 			ref<Expr> base = eval(ki, 0, state).value;
+#if DEBUG_RUNTIME
 			llvm::errs() << "Load base : " << base << "\n";
+#endif
 			executeMemoryOperation(state, false, base, 0, ki);
 			break;
 		}
 		case Instruction::Store: {
 			ref<Expr> base = eval(ki, 1, state).value;
-			llvm::errs() << "Store base : " << base << "\n";
 			ref<Expr> value = eval(ki, 0, state).value;
+#if DEBUG_RUNTIME
+			llvm::errs() << "Store base : " << base << "\n";
 			llvm::errs() << "Store value : " << value << "\n";
+#endif
 			executeMemoryOperation(state, true, base, value, 0);
 			break;
 		}
@@ -3239,14 +3243,18 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite, ref<E
 				} else {
 					ObjectState *wos = state.currentStack->addressSpace->getWriteable(mo, os);
 					wos->write(offset, value);
+#if DEBUG_RUNTIME
 					llvm::errs() << "store offset : " << offset << " store address : " << mo->address << " store value : " << value << "\n";
+#endif
 				}
 			} else {
 				ref<Expr> result = os->read(offset, type);
 
 				if (interpreterOpts.MakeConcreteSymbolic)
 					result = replaceReadWithSymbolic(state, result);
+#if DEBUG_RUNTIME
 				llvm::errs() << "load value : " << result << "\n";
+#endif
 				bindLocal(target, state, result);
 			}
 

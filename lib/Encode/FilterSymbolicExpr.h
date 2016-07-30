@@ -9,6 +9,8 @@
 #include "../../include/klee/util/Ref.h"
 #include "Trace.h"
 
+#define FILTER_DEBUG 1
+
 namespace klee {
 
 class FilterSymbolicExpr {
