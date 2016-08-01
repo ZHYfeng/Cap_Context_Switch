@@ -145,8 +145,19 @@ namespace klee {
 		}
 	}
 
+	void FilterSymbolicExpr::addExprToRelate(std::set<std::string> *Expr) {
+
+		for (std::set<std::string>::iterator it = Expr->begin(), ie = Expr->end(); it != ie; ++it) {
+			std::string name = *it;
+			if (allRelatedSymbolicExprSet.find(name) == allRelatedSymbolicExprSet.end()) {
+				allRelatedSymbolicExprSet.insert(name);
+				allRelatedSymbolicExprVector.push_back(name);
+			}
+		}
+	}
+
 	bool FilterSymbolicExpr::isRelated(std::string varName) {
-		if (allRelatedSymbolicExpr.find(varName) != allRelatedSymbolicExpr.end()) {
+		if (allRelatedSymbolicExprSet.find(varName) != allRelatedSymbolicExprSet.end()) {
 			return true;
 		} else {
 			return false;
@@ -219,7 +230,8 @@ namespace klee {
 		std::string name;
 		std::vector<std::string> remainingExprName;
 		std::vector<ref<klee::Expr> > remainingExpr;
-		allRelatedSymbolicExpr.clear();
+		allRelatedSymbolicExprSet.clear();
+		allRelatedSymbolicExprVector.clear();
 		remainingExprName.clear();
 		remainingExpr.clear();
 		std::vector<ref<klee::Expr> > &storeSymbolicExpr = trace->storeSymbolicExpr;
@@ -235,7 +247,7 @@ namespace klee {
 			std::set<std::string> *tempSymbolicExpr = new std::set<std::string>;
 			resolveSymbolicExpr(it->get(), *tempSymbolicExpr);
 			brRelatedSymbolicExpr.push_back(tempSymbolicExpr);
-			addExprToSet(tempSymbolicExpr, &allRelatedSymbolicExpr);
+			addExprToRelate(tempSymbolicExpr);
 		}
 
 		std::vector<ref<klee::Expr> > &assertSymbolicExpr = trace->assertSymbolicExpr;
@@ -244,21 +256,26 @@ namespace klee {
 			std::set<std::string> *tempSymbolicExpr = new std::set<std::string>;
 			resolveSymbolicExpr(it->get(), *tempSymbolicExpr);
 			assertRelatedSymbolicExpr.push_back(tempSymbolicExpr);
-			addExprToSet(tempSymbolicExpr, &allRelatedSymbolicExpr);
+			addExprToRelate(tempSymbolicExpr);
 		}
 
 		std::vector<ref<klee::Expr> > &pathCondition = trace->pathCondition;
 		std::map<std::string, std::set<std::string>*> &varRelatedSymbolicExpr = trace->allRelatedSymbolicExpr;
-		for (std::set<std::string>::iterator nit = allRelatedSymbolicExpr.begin(); nit != allRelatedSymbolicExpr.end(); ++nit) {
+		for (std::vector<std::string>::iterator nit = allRelatedSymbolicExprVector.begin(); nit != allRelatedSymbolicExprVector.end();
+				++nit) {
 			name = *nit;
-			llvm::errs() << "allRelatedSymbolicExpr name : " << name << "\n";
+#if FILTER_DEBUG
+			llvm::errs() << "allRelatedSymbolicExprSet name : " << name << "\n";
+#endif
 			std::vector<ref<Expr> >::iterator itt = remainingExpr.begin();
 			for (std::vector<std::string>::iterator it = remainingExprName.begin(), ie = remainingExprName.end(); it != ie;) {
 				if (name == *it) {
 					remainingExprName.erase(it);
 					--ie;
 					pathCondition.push_back(*itt);
+#if FILTER_DEBUG
 					llvm::errs() << *itt << "\n";
+#endif
 					std::set<std::string> *tempSymbolicExpr = new std::set<std::string>;
 					resolveSymbolicExpr(*itt, *tempSymbolicExpr);
 					if (varRelatedSymbolicExpr.find(name) != varRelatedSymbolicExpr.end()) {
@@ -266,7 +283,7 @@ namespace klee {
 					} else {
 						varRelatedSymbolicExpr[name] = tempSymbolicExpr;
 					}
-					addExprToSet(tempSymbolicExpr, &allRelatedSymbolicExpr);
+					addExprToRelate(tempSymbolicExpr);
 					remainingExpr.erase(itt);
 				} else {
 					++it;
@@ -275,10 +292,12 @@ namespace klee {
 			}
 		}
 
-		llvm::errs() << "allRelatedSymbolicExpr" << "\n";
-		for (std::set<std::string>::iterator nit = allRelatedSymbolicExpr.begin(); nit != allRelatedSymbolicExpr.end(); ++nit) {
+#if FILTER_DEBUG
+		llvm::errs() << "allRelatedSymbolicExprSet" << "\n";
+		for (std::set<std::string>::iterator nit = allRelatedSymbolicExprSet.begin(); nit != allRelatedSymbolicExprSet.end(); ++nit) {
 			llvm::errs() << (*nit).c_str() << "\n";
 		}
+#endif
 
 		std::map<std::string, long> &varThread = trace->varThread;
 
@@ -289,7 +308,7 @@ namespace klee {
 		for (std::map<std::string, std::vector<Event *> >::iterator nit = readSet.begin(), nie = readSet.end(); nit != nie; ++nit) {
 			allReadSet.insert(*nit);
 			name = nit->first;
-			if (allRelatedSymbolicExpr.find(name) != allRelatedSymbolicExpr.end() || !OPTIMIZATION1) {
+			if (isRelated(name) || !OPTIMIZATION1) {
 				usefulReadSet.insert(*nit);
 				if (varThread.find(name) == varThread.end()) {
 					varThread[name] = (*(nit->second.begin()))->threadId;
@@ -318,7 +337,7 @@ namespace klee {
 		for (std::map<std::string, std::vector<Event *> >::iterator nit = writeSet.begin(), nie = writeSet.end(); nit != nie; ++nit) {
 			allWriteSet.insert(*nit);
 			name = nit->first;
-			if (allRelatedSymbolicExpr.find(name) != allRelatedSymbolicExpr.end() || !OPTIMIZATION1) {
+			if (isRelated(name) || !OPTIMIZATION1) {
 				usefulWriteSet.insert(*nit);
 				if (varThread.find(name) == varThread.end()) {
 					varThread[name] = (*(nit->second.begin()))->threadId;
@@ -348,16 +367,18 @@ namespace klee {
 
 		std::map<std::string, llvm::Constant*> usefulGlobal_variable_initializer;
 		std::map<std::string, llvm::Constant*> &global_variable_initializer = trace->global_variable_initializer;
-//		llvm::errs() << "global_variable_initializer = " << trace->global_variable_initializer.size() << std::endl;
-//		for (std::map<std::string, llvm::Constant*>::iterator it = trace->global_variable_initializer.begin(), ie =
-//				trace->global_variable_initializer.end(); it != ie; ++it) {
-//			llvm::errs() << it->first << std::endl;
-//		}
+#if FILTER_DEBUG
+		llvm::errs() << "global_variable_initializer = " << trace->global_variable_initializer.size() << "\n";
+		for (std::map<std::string, llvm::Constant*>::iterator it = trace->global_variable_initializer.begin(), ie =
+				trace->global_variable_initializer.end(); it != ie; ++it) {
+			llvm::errs() << it->first << "\n";
+		}
+#endif
 		usefulGlobal_variable_initializer.clear();
 		for (std::map<std::string, llvm::Constant*>::iterator nit = global_variable_initializer.begin(), nie =
 				global_variable_initializer.end(); nit != nie; ++nit) {
 			name = nit->first;
-			if (allRelatedSymbolicExpr.find(name) != allRelatedSymbolicExpr.end() || !OPTIMIZATION1) {
+			if (isRelated(name) || !OPTIMIZATION1) {
 				usefulGlobal_variable_initializer.insert(*nit);
 			}
 		}
@@ -366,20 +387,19 @@ namespace klee {
 				usefulGlobal_variable_initializer.end(); nit != nie; ++nit) {
 			global_variable_initializer.insert(*nit);
 		}
-//		llvm::errs() << "global_variable_initializer = " << trace->global_variable_initializer.size() << std::endl;
-//		for (std::map<std::string, llvm::Constant*>::iterator it = trace->global_variable_initializer.begin(), ie =
-//				trace->global_variable_initializer.end(); it != ie; ++it) {
-//			llvm::errs() << it->first << std::endl;
-//		}
-//
-//		std::vector<std::vector<Event*>*> eventList = trace->eventList;
+#if FILTER_DEBUG
+		llvm::errs() << "global_variable_initializer = " << trace->global_variable_initializer.size() << "\n";
+		for (std::map<std::string, llvm::Constant*>::iterator it = trace->global_variable_initializer.begin(), ie =
+				trace->global_variable_initializer.end(); it != ie; ++it) {
+			llvm::errs() << it->first << "\n";
+		}
+#endif
 		for (std::vector<Event*>::iterator currentEvent = trace->path.begin(), endEvent = trace->path.end(); currentEvent != endEvent;
 				currentEvent++) {
 			if ((*currentEvent)->isGlobal == true) {
 				if ((*currentEvent)->inst->inst->getOpcode() == llvm::Instruction::Load
 						|| (*currentEvent)->inst->inst->getOpcode() == llvm::Instruction::Store) {
-					if (allRelatedSymbolicExpr.find((*currentEvent)->name) == allRelatedSymbolicExpr.end() && OPTIMIZATION1) {
-//					(*currentEvent)->isGlobal = false;
+					if (isRelated((*currentEvent)->name) && OPTIMIZATION1) {
 						(*currentEvent)->isEventRelatedToBranch = false;
 					} else {
 						(*currentEvent)->isEventRelatedToBranch = true;
@@ -394,7 +414,7 @@ namespace klee {
 		std::vector<ref<klee::Expr> > &rwSymbolicExpr = trace->rwSymbolicExpr;
 		for (std::vector<ref<klee::Expr> >::iterator nit = rwSymbolicExpr.begin(), nie = rwSymbolicExpr.end(); nit != nie; ++nit) {
 			name = getName((*nit)->getKid(1));
-			if (allRelatedSymbolicExpr.find(name) != allRelatedSymbolicExpr.end() || !OPTIMIZATION1) {
+			if (isRelated(name) || !OPTIMIZATION1) {
 				rwSymbolicExprRelatedToBranch.push_back(*nit);
 			}
 		}
@@ -404,7 +424,7 @@ namespace klee {
 			rwSymbolicExpr.push_back(*nit);
 		}
 
-		fillterTrace(trace, allRelatedSymbolicExpr);
+		fillterTrace(trace, allRelatedSymbolicExprSet);
 
 	}
 

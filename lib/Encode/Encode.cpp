@@ -228,14 +228,16 @@ namespace klee {
 			gettimeofday(&start, NULL);
 
 			bool branch = filter.filterUselessWithSet(trace, trace->brRelatedSymbolicExpr[i]);
-//		bool branch = true;
-//		branch = true;
+//			bool branch = true;
+//			branch = true;
 			gettimeofday(&finish, NULL);
 			double cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-			std::cerr << "CCost : " << cost << "\n";
+//			std::cerr << "CCost : " << cost << "    ";
 
 			if (!branch) {
+#if BRANCH_INFO
 				std::cerr << "NNo!\n";
+#endif
 //		} else {
 //			std::cerr << "YYes!\n";
 //			struct timeval start, finish;
@@ -334,7 +336,9 @@ namespace klee {
 				}
 				gettimeofday(&finish, NULL);
 				double cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-				std::cerr << "Cost : " << cost << "\n";
+#if BRANCH_INFO
+				std::cerr << "Cost : " << cost << " ";
+#endif
 				solvingTimes++;
 				stringstream output;
 				if (result == z3::sat) {
@@ -346,19 +350,9 @@ namespace klee {
 					runtimeData->addScheduleSet(prefix);
 					runtimeData->satBranch++;
 					runtimeData->satCost += cost;
+					sum++;
 #if FORMULA_DEBUG
 					showPrefixInfo(prefix, ifFormula[i].first);
-#endif
-				} else {
-					runtimeData->unSatBranchBySolve++;
-					runtimeData->unSatCost += cost;
-				}
-
-#if BRANCH_INFO
-				if (result == z3::sat) {
-					sum++;
-					std::cerr << "Yes!\n";
-#if FORMULA_DEBUG
 					std::ofstream out_file(output.str().c_str(), std::ios_base::out | std::ios_base::app);
 					out_file << "!ifFormula[i].second : " << !ifFormula[i].second << "\n";
 					out_file << "\n" << z3_solver << "\n";
@@ -367,11 +361,20 @@ namespace klee {
 					out_file << "\n" << m << "\n";
 					out_file.close();
 #endif
+				} else {
+					runtimeData->unSatBranchBySolve++;
+					runtimeData->unSatCost += cost;
+				}
+
+#if BRANCH_INFO
+				if (result == z3::sat) {
+					std::cerr << "Yes!\n";
 				} else if (result == z3::unsat) {
 					std::cerr << "No!\n";
 				} else
 					std::cerr << "Warning!\n";
 #endif
+
 			} else {
 				runtimeData->unSatBranchByPreSolve++;
 			}
@@ -1383,7 +1386,6 @@ namespace klee {
 			//the event is at the point of creating thread
 			string creatPoint = itc->first->eventName;
 			//the event is the first step of created thread
-			std::cerr << trace->eventList[itc->second] << "\n";
 			if (trace->eventList[itc->second] != 0) {
 				string firstStep = trace->eventList[itc->second]->at(0)->eventName;
 				expr prev = z3_ctx.int_const(creatPoint.c_str());
@@ -1543,11 +1545,13 @@ namespace klee {
 					oneVarAllRead.push_back(if_and_only_if);
 				}
 
-				expr oneReadExprs = makeExprsOr(oneVarAllRead);
+				if(oneVarAllRead.size() > 0) {
+					expr oneReadExprs = makeExprsOr(oneVarAllRead);
 #if FORMULA_DEBUG
-				std::cerr << oneReadExprs << "\n";
+					std::cerr << oneReadExprs << "\n";
 #endif
-				z3_solver_rw.add(oneReadExprs);
+					z3_solver_rw.add(oneReadExprs);
+				}
 			}
 		}
 	}

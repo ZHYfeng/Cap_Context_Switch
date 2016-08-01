@@ -9,14 +9,15 @@
 #include "../../include/klee/util/Ref.h"
 #include "Trace.h"
 
-#define FILTER_DEBUG 1
+#define FILTER_DEBUG 0
 
 namespace klee {
 
 class FilterSymbolicExpr {
 
 	private:
-		std::set<std::string> allRelatedSymbolicExpr;
+		std::set<std::string> allRelatedSymbolicExprSet;
+		std::vector<std::string> allRelatedSymbolicExprVector;
 
 	public:
 		static std::string getName(ref<Expr> value);
@@ -28,6 +29,7 @@ class FilterSymbolicExpr {
 		static void addExprToSet(std::set<std::string> *Expr, std::set<std::string> *exprSet);
 		static void addExprToVector(std::vector<std::string> *Expr, std::vector<std::string> *exprVector);
 		static void addExprToVector(std::set<std::string> *Expr, std::vector<std::string> *exprVectr);
+		void addExprToRelate(std::set<std::string> *Expr);
 		bool isRelated(std::string varName);
 		void fillterTrace(Trace* trace, std::set<std::string> allRelatedSymbolicExpr);
 		void filterUseless(Trace* trace);
