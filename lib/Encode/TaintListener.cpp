@@ -194,6 +194,9 @@ namespace klee {
 									ref<Expr> svalue = executor->evalCurrent(ki, j, state).value;
 									if (value->isTaint) {
 										svalue->isTaint = true;
+#if DEBUG_RUNTIME
+										llvm::errs() << "svalue->isTaint = true;" << "\n";
+#endif
 									}
 									executor->ineval(ki, j, state, svalue);
 								}
@@ -291,7 +294,9 @@ namespace klee {
 						manualMakeTaint(value, false);
 					}
 					executor->getDestCell(state, ki).value = value;
-//					llvm::errs() << value << " taint : " << isTaint << "\n";
+#if DEBUG_RUNTIME
+					llvm::errs() << value << " taint : " << isTaint << "\n";
+#endif
 					break;
 				}
 				case Instruction::Store: {
@@ -316,7 +321,10 @@ namespace klee {
 							}
 						}
 						if (isTaint) {
-							executor->getDestCell(state, ki).value.get()->isTaint = true;
+#if DEBUG_RUNTIME
+							llvm::errs() << "executor->getDestCell(state, ki).value->isTaint = true;" << "\n";
+#endif
+							executor->getDestCell(state, ki).value->isTaint = true;
 						}
 					}
 

@@ -119,6 +119,7 @@ ObjectState::ObjectState(const MemoryObject *mo)
     updates = UpdateList(array, 0);
   }
   memset(concreteStore, 0, size);
+//  llvm::errs() << "ObjectState address : " << object->address << "\n";
 }
 
 
@@ -136,11 +137,13 @@ ObjectState::ObjectState(const MemoryObject *mo, const Array *array)
   mo->refCount++;
   makeSymbolic();
   memset(concreteStore, 0, size);
+//  llvm::errs() << "ObjectState address : " << object->address << "\n";
 }
 
 ObjectState::ObjectState(unsigned size, const Array *array)
   : copyOnWriteOwner(0),
     refCount(0),
+	object(0),
     concreteStore(new uint8_t[size]),
     concreteMask(0),
     flushMask(0),
@@ -175,6 +178,7 @@ ObjectState::ObjectState(const ObjectState &os)
   }
 
   memcpy(concreteStore, os.concreteStore, size*sizeof(*concreteStore));
+//  llvm::errs() << "ObjectState address : " << object->address << "\n";
 }
 
 ObjectState::~ObjectState() {
@@ -187,6 +191,7 @@ ObjectState::~ObjectState() {
 		delete[] knownSymbolics;
 	delete[] concreteStore;
 
+//	llvm::errs() << "~ObjectState address : " << object->address << "\n";
 	if (object) {
 		assert(object->refCount > 0);
 		object->refCount--;

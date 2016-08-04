@@ -672,12 +672,16 @@ namespace klee {
 
 		executor->getNewPrefix();
 
-		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+//		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
 //			delete *bit;
-		}
+//		}
 		bitcodeListeners.pop_back();
 		bitcodeListeners.pop_back();
 		bitcodeListeners.pop_back();
+
+//		if(executor->executionNum >= 70){
+//			executor->isFinished = true;
+//		}
 
 	}
 

@@ -3677,8 +3677,8 @@ void Executor::runVerification(llvm::Function *f, int argc, char **argv, char **
 		execStatus = SUCCESS;
 		listenerService->startControl(this);
 		runFunctionAsMain(f, argc, argv, envp);
-		prepareNextExecution();
 		listenerService->endControl(this);
+		prepareNextExecution();
 	}
 }
 

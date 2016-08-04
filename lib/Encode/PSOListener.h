@@ -115,6 +115,9 @@ namespace klee {
 				}
 				ss << signal;
 				ss << time;
+#if DEBUG_RUNTIME
+				llvm::errs() << "createGlobalVarFullName : " << ss.str() << "\n";
+#endif
 				return ss.str();
 			}
 

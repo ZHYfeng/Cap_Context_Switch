@@ -41,7 +41,7 @@
 #include "../../include/klee/util/Ref.h"
 #include "Prefix.h"
 
-#define FORMULA_DEBUG 1
+#define FORMULA_DEBUG 0
 #define BRANCH_INFO 1
 #define BUFFERSIZE 300
 #define BIT_WIDTH 64
@@ -65,6 +65,19 @@ namespace klee {
 		buildPartialOrderFormula(z3_solver);
 		buildReadWriteFormula(z3_solver);
 		buildSynchronizeFormula(z3_solver);
+
+		check_result result;
+		try {
+			//statics
+			result = z3_solver.check();
+			if (result == z3::sat) {
+				std::cerr << "buildAllFormula  success!" << "\n";
+			} else {
+				std::cerr << "buildAllFormula  unsuccess!" << "\n";
+			}
+		} catch (z3::exception & ex) {
+			std::cerr << "\nUnexpected error: " << ex.msg() << "\n";
+		}
 	}
 
 	void Encode::buildPTSFormula() {
@@ -432,7 +445,7 @@ namespace klee {
 
 //	std::cerr << "z3_taint_solver \n" << z3_taint_solver;
 
-		std::cerr << "PTS\n";
+		std::cerr << "\nPTS\n";
 
 		std::vector<std::string> &PTS = trace->PTS;
 		std::vector<std::string> &taintPTS = trace->taintPTS;
@@ -1407,14 +1420,14 @@ namespace klee {
 		for (; itj != trace->joinThreadPoint.end(); itj++) {
 			//the event is at the point of joining thread
 			string joinPoint = itj->first->eventName;
-			std::cerr << "jionPoint : " << joinPoint << "\n";
 			//the event is the last step of joined thread
 			string lastStep = trace->eventList[itj->second]->back()->eventName;
-			std::cerr << "lastStep : " << lastStep << "\n";
 			expr prev = z3_ctx.int_const(lastStep.c_str());
 			expr back = z3_ctx.int_const(joinPoint.c_str());
 			expr twoEventOrder = (prev < back);
 #if FORMULA_DEBUG
+			std::cerr << "jionPoint : " << joinPoint << "\n";
+			std::cerr << "lastStep : " << lastStep << "\n";
 			std::cerr << twoEventOrder << "\n";
 #endif
 			z3_solver_po.add(twoEventOrder);
@@ -1480,9 +1493,10 @@ namespace klee {
 					}
 				}
 				if (currentRead->latestWriteEventInSameThread != NULL) {
+//					llvm::errs() << "currentRead->latestWriteEventInSameThread : " << currentRead->latestWriteEventInSameThread->globalName << "\n";
 					mayBeRead.push_back(currentRead->latestWriteEventInSameThread);
-				} else		//if this read don't have the corresponding write, it may use from Initialization operation.
-				{
+				} else {
+					//if this read don't have the corresponding write, it may use from Initialization operation.
 					//so, build the formula constrainting this read uses from Initialization operation
 
 					vector<expr> oneVarOneRead;

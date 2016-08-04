@@ -175,11 +175,6 @@ namespace klee {
 					} else {
 						assert(0 && "cond not exist");
 					}
-#if DEBUG_RUNTIME
-					ki->inst->dump();
-					llvm::errs() << "event name : " << item->eventName << "\n";
-					llvm::errs() << "wait : " << item->condName << "\n";
-#endif
 				} else if (f->getName().str() == "pthread_cond_signal") {
 					ref<Expr> param = executor->eval(ki, 1, state).value;
 					ObjectPair op;
@@ -191,11 +186,6 @@ namespace klee {
 					} else {
 						assert(0 && "cond not exist");
 					}
-#if DEBUG_RUNTIME
-					ki->inst->dump();
-					llvm::errs() << "event name : " << item->eventName << "\n";
-					llvm::errs() << "signal  : " << item->condName << "\n";
-#endif
 				} else if (f->getName().str() == "pthread_cond_broadcast") {
 					ref<Expr> param = executor->eval(ki, 1, state).value;
 					ObjectPair op;
@@ -207,11 +197,6 @@ namespace klee {
 					} else {
 						assert(0 && "cond not exist");
 					}
-#if DEBUG_RUNTIME
-					ki->inst->dump();
-					llvm::errs() << "event name : " << item->eventName << "\n";
-					llvm::errs() << "broadcast cond  : " << item->condName << "\n";
-#endif
 				} else if (f->getName().str() == "pthread_mutex_lock") {
 					ref<Expr> param = executor->eval(ki, 1, state).value;
 					ObjectPair op;
