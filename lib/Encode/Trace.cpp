@@ -539,6 +539,7 @@ namespace klee {
 
 	std::string Trace::getAssemblyLine(std::string name) {
 		std::stringstream varName;
+		std::stringstream AssemblyLineName;
 		varName.str("");
 		unsigned int i = 0;
 		while ((name.at(i) != 'S') && (name.at(i) != 'L')) {
@@ -562,8 +563,25 @@ namespace klee {
 			if ((*it)->globalName == name) {
 //			return  Transfer::uint64toString((*it)->threadId) + "_" + Transfer::uint64toString((*it)->threadEventId);
 				return Transfer::uint64toString((*it)->inst->info->assemblyLine);
+//				AssemblyLineName << Transfer::uint64toString((*it)->inst->info->assemblyLine);
 			}
 		}
+
+//		i = 0;
+//		while ((name.at(i) != '_')) {
+//			i++;
+//		}
+//
+//		while (i < name.size()) {
+//			AssemblyLineName << name.at(i);
+//			i++;
+//		}
+//			std::cerr << "getAssemblyLine name : " << AssemblyLineName.str() << "\n";
+//
+//		return AssemblyLineName.str();
+
+
+
 		assert(0 && "getAssemblyLine can not find");
 		return 0;
 	}

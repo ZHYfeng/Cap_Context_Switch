@@ -407,7 +407,7 @@ bool ExecutionState::examineAllThreadFinalState() {
 
 unsigned ExecutionState::getNextThreadId() {
 	unsigned threadId = nextThreadId++;
-	assert (nextThreadId <= 6 && "vector clock 只有5个");
+	assert (nextThreadId < 17 && "vector clock 只有16个");
 	return threadId;
 }
 
@@ -421,7 +421,7 @@ Thread* ExecutionState::createThread(KFunction *kf) {
 Thread* ExecutionState::createThread(KFunction *kf, unsigned threadId) {
 	if (threadId >= nextThreadId) {
 		nextThreadId = threadId + 1;
-		assert (nextThreadId <= 6 && "vector clock 只有5个");
+		assert (nextThreadId < 17 && "vector clock 只有16个");
 	}
 	Thread* newThread = new Thread(threadId, currentThread, kf, &addressSpace);
 	threadList.addThread(newThread);

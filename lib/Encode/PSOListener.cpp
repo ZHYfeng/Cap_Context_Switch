@@ -131,7 +131,7 @@ namespace klee {
 						if (executor->isGlobalMO(pthreadmo)) {
 							item->isGlobal = true;
 						}
-						string varName = createVarName(pthreadmo->id, pthreadAddress, item->isGlobal);
+						string varName = createVarName(pthreadmo->id, key, item->isGlobal);
 						string varFullName;
 						if (item->isGlobal) {
 							unsigned loadTime = getLoadTime(key);
@@ -266,7 +266,7 @@ namespace klee {
 							if (executor->isGlobalMO(mo)) {
 								item->isGlobal = true;
 							}
-							string varName = createVarName(mo->id, address, item->isGlobal);
+							string varName = createVarName(mo->id, key, item->isGlobal);
 							string varFullName;
 							if (item->isGlobal) {
 								unsigned storeTime = getStoreTimeForTaint(key);
@@ -346,7 +346,7 @@ namespace klee {
 							if (executor->isGlobalMO(mo)) {
 								item->isGlobal = true;
 							}
-							string varName = createVarName(mo->id, address, item->isGlobal);
+							string varName = createVarName(mo->id, key, item->isGlobal);
 							string varFullName;
 							if (item->isGlobal) {
 								unsigned loadTime = getLoadTime(key);
@@ -404,7 +404,7 @@ namespace klee {
 						if (executor->isGlobalMO(mo)) {
 							item->isGlobal = true;
 						}
-						string varName = createVarName(mo->id, address, item->isGlobal);
+						string varName = createVarName(mo->id, key, item->isGlobal);
 						string varFullName;
 						if (item->isGlobal) {
 							unsigned storeTime = getStoreTime(key);
@@ -723,7 +723,7 @@ namespace klee {
 			for (unsigned i = 0; i < destmo->size - destaddress + destmo->address; i++) {
 				ref<Expr> ch = destos->read(i, 8);
 				ConstantExpr* cexpr = dyn_cast<ConstantExpr>(ch);
-				string name = createVarName(destmo->id, destaddress + i, executor->isGlobalMO(destmo));
+				string name = createVarName(destmo->id, destmo->address +i, executor->isGlobalMO(destmo));
 				if (executor->isGlobalMO(destmo)) {
 					unsigned storeTime = getStoreTime(destaddress + i);
 
