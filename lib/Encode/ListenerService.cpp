@@ -582,8 +582,8 @@ namespace klee {
 		pushListener(PSOlistener);
 		BitcodeListener* Symboliclistener = new SymbolicListener(executor, &rdManager);
 		pushListener(Symboliclistener);
-		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
-		pushListener(Taintlistener);
+//		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
+//		pushListener(Taintlistener);
 
 		unsigned traceNum = executor->executionNum;
 		llvm::errs() << "\n";
@@ -650,20 +650,20 @@ namespace klee {
 			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
 			rdManager.solvingCost += cost;
 
-			gettimeofday(&start, NULL);
-			dtam = new DTAM(&rdManager);
-			dtam->dtam();
-			gettimeofday(&finish, NULL);
-			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-			rdManager.DTAMCost += cost;
-			rdManager.allDTAMCost.push_back(cost);
-
-			gettimeofday(&start, NULL);
-			encode->PTS();
-			gettimeofday(&finish, NULL);
-			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-			rdManager.PTSCost += cost;
-			rdManager.allPTSCost.push_back(cost);
+//			gettimeofday(&start, NULL);
+//			dtam = new DTAM(&rdManager);
+//			dtam->dtam();
+//			gettimeofday(&finish, NULL);
+//			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+//			rdManager.DTAMCost += cost;
+//			rdManager.allDTAMCost.push_back(cost);
+//
+//			gettimeofday(&start, NULL);
+//			encode->PTS();
+//			gettimeofday(&finish, NULL);
+//			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+//			rdManager.PTSCost += cost;
+//			rdManager.allPTSCost.push_back(cost);
 
 			delete encode;
 			delete dtam;
@@ -672,16 +672,14 @@ namespace klee {
 
 		executor->getNewPrefix();
 
-//		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
+		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
 //			delete *bit;
-//		}
-		bitcodeListeners.pop_back();
-		bitcodeListeners.pop_back();
-		bitcodeListeners.pop_back();
+			bitcodeListeners.pop_back();
+		}
 
-//		if(executor->executionNum >= 70){
-//			executor->isFinished = true;
-//		}
+		if(executor->executionNum >= 70){
+			executor->isFinished = true;
+		}
 
 	}
 

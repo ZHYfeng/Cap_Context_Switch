@@ -202,7 +202,7 @@ namespace {
 	cl::opt<unsigned> MaxDepth("max-depth", cl::desc("Only allow this many symbolic branches (default=0 (off))"), cl::init(0));
 
 	cl::opt<unsigned> MaxMemory("max-memory", cl::desc("Refuse to fork when above this amount of memory (in MB, default=2000)"),
-			cl::init(8000));
+			cl::init(16000));
 
 	cl::opt<bool> MaxMemoryInhibit("max-memory-inhibit", cl::desc("Inhibit forking at memory cap (vs. random terminate) (default=on)"),
 			cl::init(true));

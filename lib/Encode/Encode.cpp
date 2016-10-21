@@ -48,6 +48,9 @@
 
 #define INT_ARITHMETIC 0
 
+#define OPTIMIZATION2 1
+#define OPTIMIZATION3 1
+
 using namespace llvm;
 using namespace std;
 using namespace z3;
@@ -239,12 +242,13 @@ namespace klee {
 
 			struct timeval start, finish;
 			gettimeofday(&start, NULL);
-
+#if !OPTIMIZATION2
 			bool branch = filter.filterUselessWithSet(trace, trace->brRelatedSymbolicExpr[i]);
-//			bool branch = true;
-//			branch = true;
+#else
+			bool branch = true;
+#endif
 			gettimeofday(&finish, NULL);
-			double cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+//			double cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
 //			std::cerr << "CCost : " << cost << "    ";
 
 			if (!branch) {
@@ -294,28 +298,30 @@ namespace klee {
 
 				Event* curr = ifFormula[i].first;
 
-//			//添加读写的解
-//			std::set<std::string> &RelatedSymbolicExpr = trace->RelatedSymbolicExpr;
-//			std::vector<ref<klee::Expr> > &rwSymbolicExpr = trace->rwSymbolicExpr;
-//			std::string varName;
-//			unsigned int totalRwExpr = rwFormula.size();
-//			for (unsigned int j = 0; j < totalRwExpr; j++){
-//				varName = filter.getName(rwSymbolicExpr[j]->getKid(1));
-//				if (RelatedSymbolicExpr.find(varName) == RelatedSymbolicExpr.end()){
-//					Event* temp = rwFormula[j].first;
-//					expr currIf = z3_ctx.int_const(curr->eventName.c_str());
-//					expr tempIf = z3_ctx.int_const(temp->eventName.c_str());
-//					expr constraint = z3_ctx.bool_val(1);
-//					if (curr->threadId == temp->threadId) {
-//						if (curr->eventId > temp->eventId)
-//							constraint = rwFormula[j].second;
-//					} else {
-//						constraint = implies(tempIf < currIf, rwFormula[j].second);
-//					}
-//					z3_solver.add(constraint);
-////					z3_solver.add(rwFormula[j].second);
-//				}
-//			}
+#if !OPTIMIZATION3
+			//添加读写的解
+			std::set<std::string> &RelatedSymbolicExpr = trace->RelatedSymbolicExpr;
+			std::vector<ref<klee::Expr> > &rwSymbolicExpr = trace->rwSymbolicExpr;
+			std::string varName;
+			unsigned int totalRwExpr = rwFormula.size();
+			for (unsigned int j = 0; j < totalRwExpr; j++){
+				varName = filter.getName(rwSymbolicExpr[j]->getKid(1));
+				if (RelatedSymbolicExpr.find(varName) == RelatedSymbolicExpr.end()){
+					Event* temp = rwFormula[j].first;
+					expr currIf = z3_ctx.int_const(curr->eventName.c_str());
+					expr tempIf = z3_ctx.int_const(temp->eventName.c_str());
+					expr constraint = z3_ctx.bool_val(1);
+					if (curr->threadId == temp->threadId) {
+						if (curr->eventId > temp->eventId)
+							constraint = rwFormula[j].second;
+					} else {
+						constraint = implies(tempIf < currIf, rwFormula[j].second);
+					}
+					z3_solver.add(constraint);
+//					z3_solver.add(rwFormula[j].second);
+				}
+			}
+#endif
 
 				z3_solver.add(!ifFormula[i].second);
 				for (unsigned j = 0; j < ifFormula.size(); j++) {
