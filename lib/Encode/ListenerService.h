@@ -53,6 +53,8 @@ namespace klee {
 			void startControl(Executor* executor);
 			void endControl(Executor* executor);
 
+			void ContextSwitch(Executor* executor, ExecutionState &state);
+
 	};
 
 }

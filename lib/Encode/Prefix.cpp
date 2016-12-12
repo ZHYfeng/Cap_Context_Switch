@@ -18,7 +18,12 @@ using namespace ::llvm;
 namespace klee {
 
 	Prefix::Prefix(vector<Event*>& eventList, std::map<Event*, uint64_t>& threadIdMap, std::string name) :
-			eventList(eventList), threadIdMap(threadIdMap), name(name) {
+			eventList(eventList), threadIdMap(threadIdMap), name(name), ContextSwitch(0) {
+		position = this->eventList.begin();
+	}
+
+	Prefix::Prefix(std::vector<Event*>& eventList, std::map<Event*, uint64_t>& threadIdMap, std::string name, int ContextSwitch) :
+			eventList(eventList), threadIdMap(threadIdMap), name(name), ContextSwitch(ContextSwitch) {
 		position = this->eventList.begin();
 	}
 
@@ -104,6 +109,10 @@ namespace klee {
 	}
 	std::string Prefix::getName() {
 		return name;
+	}
+
+	int Prefix::getContextSwitch() {
+		return ContextSwitch;
 	}
 
 } /* namespace klee */

@@ -158,10 +158,10 @@ namespace klee {
 
 	void ListenerService::beforeExecuteInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
 
-#if DEBUG_RUNTIME
+#if !DEBUG_RUNTIME
 		llvm::errs() << "thread id : " << state.currentThread->threadId << "  ";
 		ki->inst->dump();
-		//		llvm::errs() << " before : " << "\n";
+//		llvm::errs() << " before : " << "prefix : " << executor->prefix->isFinished() << "\n";
 #endif
 
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
@@ -200,7 +200,8 @@ namespace klee {
 						const FunctionType *fpType = dyn_cast<FunctionType>(cast<PointerType>(fp->getType())->getElementType());
 						if (fType != fpType) {
 							unsigned i = 0;
-							for (std::vector<ref<Expr> >::iterator ai = (*bit)->arguments.begin(), ie = (*bit)->arguments.end(); ai != ie; ++ai) {
+							for (std::vector<ref<Expr> >::iterator ai = (*bit)->arguments.begin(), ie = (*bit)->arguments.end(); ai != ie;
+									++ai) {
 								Expr::Width to, from = (*ai)->getWidth();
 								if (i < fType->getNumParams()) {
 									to = executor->getWidthForLLVMType(fType->getParamType(i));
@@ -227,15 +228,17 @@ namespace klee {
 									if (WordSize == Expr::Int32) {
 										executor->executeMemoryOperation(state, true, (*bit)->arguments[0], sf.varargs->getBaseExpr(), 0);
 									} else {
-										executor->executeMemoryOperation(state, true, (*bit)->arguments[0], ConstantExpr::create(48, 32), 0); // gp_offset
+										executor->executeMemoryOperation(state, true, (*bit)->arguments[0], ConstantExpr::create(48, 32),
+												0); // gp_offset
 										executor->executeMemoryOperation(state, true,
-												AddExpr::create((*bit)->arguments[0], ConstantExpr::create(4, 64)), ConstantExpr::create(304, 32),
-												0); // fp_offset
+												AddExpr::create((*bit)->arguments[0], ConstantExpr::create(4, 64)),
+												ConstantExpr::create(304, 32), 0); // fp_offset
 										executor->executeMemoryOperation(state, true,
-												AddExpr::create((*bit)->arguments[0], ConstantExpr::create(8, 64)), sf.varargs->getBaseExpr(), 0); // overflow_arg_area
+												AddExpr::create((*bit)->arguments[0], ConstantExpr::create(8, 64)),
+												sf.varargs->getBaseExpr(), 0); // overflow_arg_area
 										executor->executeMemoryOperation(state, true,
-												AddExpr::create((*bit)->arguments[0], ConstantExpr::create(16, 64)), ConstantExpr::create(0, 64),
-												0); // reg_save_area
+												AddExpr::create((*bit)->arguments[0], ConstantExpr::create(16, 64)),
+												ConstantExpr::create(0, 64), 0); // reg_save_area
 									}
 									break;
 								}
@@ -580,8 +583,8 @@ namespace klee {
 
 		BitcodeListener* PSOlistener = new PSOListener(executor, &rdManager);
 		pushListener(PSOlistener);
-		BitcodeListener* Symboliclistener = new SymbolicListener(executor, &rdManager);
-		pushListener(Symboliclistener);
+//		BitcodeListener* Symboliclistener = new SymbolicListener(executor, &rdManager);
+//		pushListener(Symboliclistener);
 //		BitcodeListener* Taintlistener = new TaintListener(executor, &rdManager);
 //		pushListener(Taintlistener);
 
@@ -611,44 +614,45 @@ namespace klee {
 
 		if (executor->execStatus != Executor::SUCCESS) {
 			llvm::errs() << "######################执行有错误,放弃本次执行##############\n";
-			executor->isFinished = true;
-			return;
+//			executor->isFinished = true;
+			executor->execStatus = Executor::SUCCESS;
+//			return;
 		} else if (!rdManager.isCurrentTraceUntested()) {
 			rdManager.getCurrentTrace()->traceType = Trace::REDUNDANT;
 			llvm::errs() << "######################本条路径为旧路径####################\n";
 		} else {
 			llvm::errs() << "######################本条路径为新路径####################\n";
 			rdManager.getCurrentTrace()->traceType = Trace::UNIQUE;
-			Trace* trace = rdManager.getCurrentTrace();
+//			Trace* trace = rdManager.getCurrentTrace();
 
-			unsigned allGlobal = 0;
-			std::map<std::string, std::vector<Event *> > &writeSet = trace->writeSet;
-			std::map<std::string, std::vector<Event *> > &readSet = trace->readSet;
-			for (std::map<std::string, std::vector<Event *> >::iterator nit = readSet.begin(), nie = readSet.end(); nit != nie; ++nit) {
-				allGlobal += nit->second.size();
-			}
-			for (std::map<std::string, std::vector<Event *> >::iterator nit = writeSet.begin(), nie = writeSet.end(); nit != nie; ++nit) {
-				std::string varName = nit->first;
-				if (trace->readSet.find(varName) == trace->readSet.end()) {
-					allGlobal += nit->second.size();
-				}
-			}
-			rdManager.allGlobal += allGlobal;
+//			unsigned allGlobal = 0;
+//			std::map<std::string, std::vector<Event *> > &writeSet = trace->writeSet;
+//			std::map<std::string, std::vector<Event *> > &readSet = trace->readSet;
+//			for (std::map<std::string, std::vector<Event *> >::iterator nit = readSet.begin(), nie = readSet.end(); nit != nie; ++nit) {
+//				allGlobal += nit->second.size();
+//			}
+//			for (std::map<std::string, std::vector<Event *> >::iterator nit = writeSet.begin(), nie = writeSet.end(); nit != nie; ++nit) {
+//				std::string varName = nit->first;
+//				if (trace->readSet.find(varName) == trace->readSet.end()) {
+//					allGlobal += nit->second.size();
+//				}
+//			}
+//			rdManager.allGlobal += allGlobal;
 
-			gettimeofday(&finish, NULL);
-			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-			rdManager.runningCost += cost;
-			rdManager.allDTAMSerialCost.push_back(cost);
-
-			gettimeofday(&start, NULL);
-			encode = new Encode(&rdManager);
-			encode->buildifAndassert();
-			if (encode->verify()) {
-				encode->check_if();
-			}
-			gettimeofday(&finish, NULL);
-			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
-			rdManager.solvingCost += cost;
+//			gettimeofday(&finish, NULL);
+//			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+//			rdManager.runningCost += cost;
+//			rdManager.allDTAMSerialCost.push_back(cost);
+//
+//			gettimeofday(&start, NULL);
+//			encode = new Encode(&rdManager);
+//			encode->buildifAndassert();
+//			if (encode->verify()) {
+//				encode->check_if();
+//			}
+//			gettimeofday(&finish, NULL);
+//			cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec - start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+//			rdManager.solvingCost += cost;
 
 //			gettimeofday(&start, NULL);
 //			dtam = new DTAM(&rdManager);
@@ -665,8 +669,8 @@ namespace klee {
 //			rdManager.PTSCost += cost;
 //			rdManager.allPTSCost.push_back(cost);
 
-			delete encode;
-			delete dtam;
+//			delete encode;
+//			delete dtam;
 
 		}
 
@@ -677,10 +681,74 @@ namespace klee {
 			bitcodeListeners.pop_back();
 		}
 
-		if(executor->executionNum >= 70){
+		if (executor->executionNum >= 70) {
 			executor->isFinished = true;
 		}
 
+	}
+
+	void ListenerService::ContextSwitch(Executor* executor, ExecutionState &state) {
+
+		Trace* trace = rdManager.getCurrentTrace();
+		std::vector<Event*> path = trace->path;
+		Thread* thread = state.getCurrentThread();
+		Thread* SwitchThread = state.getCurrentThread();
+		std::list<Thread*> queue = state.getQueue();
+
+		switch (thread->threadState) {
+			case Thread::RUNNABLE: {
+				if (state.ContextSwitch < 2 && !(executor->prefix && !executor->prefix->isFinished()) && state.isGlobal) {
+					std::list<Thread*>::iterator it = queue.begin();
+					std::list<Thread*>::iterator ie = queue.end();
+					if (queue.size() > 1) {
+						it++;
+						for (; it != ie; it++) {
+							SwitchThread = *it;
+							KInstruction *ki = SwitchThread->pc;
+							Event* item = trace->createEvent(SwitchThread->threadId, ki, Event::NORMAL);
+							path.push_back(item);
+							stringstream ss;
+							ss << "Trace" << trace->Id << "#" << item->eventId;
+							Prefix* prefix = new Prefix(path, trace->createThreadPoint, ss.str(), state.ContextSwitch + 1);
+//							llvm::errs() << "rdManager.addScheduleSet(prefix) state.ContextSwitch + 1　:　" << ss.str() << "\n";
+							rdManager.addScheduleSet(prefix);
+							path.pop_back();
+							state.isGlobal = false;
+						}
+					}
+				}
+				break;
+			}
+
+			case Thread::MUTEX_BLOCKED: {
+				//maybe not need;
+				if (state.ContextSwitch < 2 && !(executor->prefix && !executor->prefix->isFinished()) && state.isGlobal) {
+					std::list<Thread*>::iterator it = queue.begin();
+					std::list<Thread*>::iterator ie = queue.end();
+					if (queue.size() > 1) {
+						it++;
+						for (; it != ie; it++) {
+							SwitchThread = *it;
+							KInstruction *ki = SwitchThread->pc;
+							Event* item = trace->createEvent(SwitchThread->threadId, ki, Event::NORMAL);
+							path.push_back(item);
+							stringstream ss;
+							ss << "Trace" << trace->Id << "#" << item->eventId;
+							Prefix* prefix = new Prefix(path, trace->createThreadPoint, ss.str(), state.ContextSwitch);
+//							llvm::errs() << "rdManager.addScheduleSet(prefix) state.ContextSwitch　:　" << ss.str() << "\n";
+							rdManager.addScheduleSet(prefix);
+							path.pop_back();
+							state.isGlobal = false;
+						}
+					}
+				}
+				break;
+			}
+
+			default: {
+				break;
+			}
+		}
 	}
 
 }

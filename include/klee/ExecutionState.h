@@ -125,6 +125,9 @@ namespace klee {
 			BarrierManager barrierManager;
 			std::map<unsigned, std::vector<unsigned> > joinRecord;
 
+			int ContextSwitch;
+			bool isGlobal;
+
 		public:
 			ExecutionState(KFunction *kf);
 
@@ -177,6 +180,8 @@ namespace klee {
 			void switchThreadToRunnable(unsigned threadId);
 
 			void reSchedule();
+
+			std::list<Thread*> getQueue();
 	};
 }
 

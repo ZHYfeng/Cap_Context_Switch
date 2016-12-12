@@ -36,6 +36,10 @@ ThreadScheduler* getThreadSchedulerByType(ThreadScheduler::ThreadSchedulerType t
 		scheduler = new PreemptiveThreadScheduler();
 		break;
 	}
+	case ThreadScheduler::Random: {
+		scheduler = new RandomThreadScheduler();
+		break;
+	}
 	default: {
 		assert("ThreadSchedulerType error");
 	}
@@ -60,6 +64,7 @@ RRThreadScheduler::RRThreadScheduler(RRThreadScheduler& scheduler, map<unsigned,
 	for (list<Thread*>::iterator ti = scheduler.queue.begin(), te = scheduler.queue.end(); ti != te; ti++) {
 		queue.push_back(threadMap[(*ti)->threadId]);
 	}
+	count = 0;
 }
 
 RRThreadScheduler::~RRThreadScheduler() {
@@ -132,6 +137,10 @@ void RRThreadScheduler::setCountZero() {
 	count = 0;
 }
 
+std::list<Thread*> RRThreadScheduler::getQueue() {
+	return queue;
+}
+
 FIFSThreadScheduler::FIFSThreadScheduler() {
 
 }
@@ -199,6 +208,10 @@ void FIFSThreadScheduler::reSchedule() {
 	Thread* thread = queue.front();
 	queue.pop_front();
 	queue.push_back(thread);
+}
+
+std::list<Thread*> FIFSThreadScheduler::getQueue() {
+	return queue;
 }
 
 PreemptiveThreadScheduler::PreemptiveThreadScheduler() {
@@ -272,6 +285,89 @@ void PreemptiveThreadScheduler::reSchedule() {
 	queue.insert(ti, thread);
 }
 
+std::list<Thread*> PreemptiveThreadScheduler::getQueue() {
+	return queue;
+}
+
+RandomThreadScheduler::RandomThreadScheduler() {
+
+}
+
+//拷贝构造，没用
+RandomThreadScheduler::RandomThreadScheduler(RandomThreadScheduler& scheduler, map<unsigned, Thread*> &threadMap) {
+	for (list<Thread*>::iterator ti = scheduler.queue.begin(), te = scheduler.queue.end(); ti != te; ti++) {
+		queue.push_back(threadMap[(*ti)->threadId]);
+	}
+}
+
+RandomThreadScheduler::~RandomThreadScheduler() {
+
+}
+
+//考虑使用迭代器而不是front();
+Thread* RandomThreadScheduler::selectCurrentItem() {
+	return queue.front();
+}
+
+Thread* RandomThreadScheduler::selectNextItem() {
+	for(int i = random()%itemNum(); i > 0; i--){
+		reSchedule();
+	}
+	return queue.front();
+}
+
+void RandomThreadScheduler::popAllItem(vector<Thread*>& allItem) {
+	allItem.reserve(queue.size());
+	for (list<Thread*>::iterator ti = queue.begin(), te = queue.end(); ti != te; ti++) {
+		allItem.push_back(*ti);
+	}
+	queue.clear();
+}
+
+int RandomThreadScheduler::itemNum() {
+	return queue.size();
+}
+
+bool RandomThreadScheduler::isSchedulerEmpty() {
+	return queue.empty();
+}
+
+void RandomThreadScheduler::addItem(Thread* item) {
+	queue.push_back(item);
+}
+
+void RandomThreadScheduler::removeItem(Thread* item) {
+	for (list<Thread*>::iterator ti = queue.begin(), te = queue.end(); ti!= te; ti++) {
+		if (*ti == item) {
+			queue.erase(ti);
+			break;
+		}
+	}
+}
+
+void RandomThreadScheduler::printAllItem(ostream &os) {
+	for (list<Thread*>::iterator ti = queue.begin(), te = queue.end(); ti!= te; ti++) {
+		Thread* thread = *ti;
+		os << thread->threadId << " state: " << thread->threadState << " current inst: " << thread->pc->inst->getOpcodeName() << " ";
+		if (thread->threadState == Thread::TERMINATED) {
+			KInstruction* ki = thread->pc;
+			os << ki->info->file << " " << ki->info->line;
+		}
+		os << endl;
+	}
+}
+
+void RandomThreadScheduler::reSchedule() {
+	Thread* thread = queue.front();
+	queue.pop_front();
+	queue.push_back(thread);
+
+}
+
+std::list<Thread*> RandomThreadScheduler::getQueue() {
+	return queue;
+}
+
 GuidedThreadScheduler::GuidedThreadScheduler(ExecutionState* state, ThreadSchedulerType schedulerType, Prefix* prefix)
 	: prefix(prefix),
 	  state(state) {
@@ -323,6 +419,10 @@ void GuidedThreadScheduler::printAllItem(std::ostream &os) {
 
 void GuidedThreadScheduler::reSchedule() {
 	subScheduler->reSchedule();
+}
+
+std::list<Thread*> GuidedThreadScheduler::getQueue() {
+	return subScheduler->getQueue();
 }
 
 } /* namespace klee */

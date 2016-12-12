@@ -30,8 +30,11 @@ namespace klee {
 			EventIterator position;
 			std::string name;
 
+			int ContextSwitch;
+
 		public:
 			Prefix(std::vector<Event*>& eventList, std::map<Event*, uint64_t>& threadIdMap, std::string name);
+			Prefix(std::vector<Event*>& eventList, std::map<Event*, uint64_t>& threadIdMap, std::string name, int ContextSwitch);
 			virtual ~Prefix();
 			std::vector<Event*>* getEventList();
 			void increasePosition();
@@ -46,6 +49,8 @@ namespace klee {
 			void print(llvm::raw_ostream &out);
 			KInstruction* getCurrentInst();
 			std::string getName();
+
+			int getContextSwitch();
 	};
 
 } /* namespace klee */

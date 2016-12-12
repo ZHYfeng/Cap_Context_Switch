@@ -2632,6 +2632,7 @@ void Executor::run(ExecutionState &initialState) {
 	while (!states.empty() && !haltExecution) {
 		ExecutionState &state = searcher->selectState();
 		Thread* thread = state.getNextThread();
+
 		bool isAbleToRun = true;
 		switch (thread->threadState) {
 			case Thread::RUNNABLE: {
@@ -2648,8 +2649,8 @@ void Executor::run(ExecutionState &initialState) {
 					if (state.mutexManager.tryToLockForBlockedThread(thread->threadId, isBlocked, errorMsg)) {
 						if (isBlocked) {
 							if (prefix && !prefix->isFinished()) {
-								llvm::errs() << "thread" << thread->threadId << ": " << thread->pc->info->file << "/" << thread->pc->info->line
-										<< " " << thread->pc->inst->getOpcodeName() << "\n";
+								llvm::errs() << "thread" << thread->threadId << ": " << thread->pc->info->file << "/"
+										<< thread->pc->info->line << " " << thread->pc->inst->getOpcodeName() << "\n";
 								thread->pc->inst->dump();
 								llvm::errs() << "thread state is MUTEX_BLOCKED, try to get lock but failed\n";
 								isAbleToRun = false;
@@ -2710,6 +2711,9 @@ void Executor::run(ExecutionState &initialState) {
 //    		assert(0 && "thread unrunnable");
 //    	}
 //    }
+
+		listenerService->ContextSwitch(this, state);
+
 		KInstruction *ki = thread->pc;
 		if (prefix && !prefix->isFinished() && ki != prefix->getCurrentInst()) {
 			//cerr << "prefix: " << prefix->getCurrentInst() << " " << prefix->getCurrentInst()->inst->getOpcodeName() << " reality: " << ki << " " << ki->inst->getOpcodeName() << endl;
@@ -3673,7 +3677,7 @@ bool Executor::isFunctionSpecial(Function* f) {
 }
 
 void Executor::runVerification(llvm::Function *f, int argc, char **argv, char **envp) {
-	while (!isFinished && execStatus != RUNTIMEERROR) {
+	while (!isFinished) {
 		execStatus = SUCCESS;
 		listenerService->startControl(this);
 		runFunctionAsMain(f, argc, argv, envp);

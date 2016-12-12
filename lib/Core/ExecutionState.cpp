@@ -68,6 +68,9 @@ ExecutionState::ExecutionState(KFunction *kf)
 	threadList.addThread(thread);
 	threadScheduler->addItem(thread);
 	currentThread = thread;
+
+	ContextSwitch = 0;
+	isGlobal = false;
 }
 
 ExecutionState::ExecutionState(KFunction *kf, Prefix* prefix)
@@ -83,12 +86,15 @@ ExecutionState::ExecutionState(KFunction *kf, Prefix* prefix)
     ptreeNode(0) {
 
 	condManager.setMutexManager(&mutexManager);
-	threadScheduler = new GuidedThreadScheduler(this, ThreadScheduler::FIFS, prefix);
+	threadScheduler = new GuidedThreadScheduler(this, ThreadScheduler::Random, prefix);
 	Thread* thread = new Thread(getNextThreadId(), NULL, kf, &addressSpace);
 	currentStack = thread->stack;
 	threadList.addThread(thread);
 	threadScheduler->addItem(thread);
 	currentThread = thread;
+
+	ContextSwitch = prefix->getContextSwitch();
+	isGlobal = false;
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
@@ -484,4 +490,8 @@ void ExecutionState::switchThreadToRunnable(unsigned threadId) {
 
 void ExecutionState::reSchedule() {
 	threadScheduler->reSchedule();
+}
+
+std::list<Thread*> ExecutionState::getQueue() {
+	return threadScheduler->getQueue();
 }
