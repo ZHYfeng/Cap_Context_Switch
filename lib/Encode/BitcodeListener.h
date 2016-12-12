@@ -38,10 +38,10 @@ class BitcodeListener {
 
 		RuntimeDataManager* rdManager;
 
-		AddressSpace addressSpace;
-		std::map<unsigned, StackType*> stack;
+//		AddressSpace addressSpace;
+//		std::map<unsigned, StackType*> stack;
 
-		std::vector<ref<Expr> > arguments;
+//		std::vector<ref<Expr> > arguments;
 
 		virtual void beforeRunMethodAsMain(ExecutionState &state) = 0;
 		virtual void beforeExecuteInstruction(ExecutionState &state, KInstruction *ki) = 0;
