@@ -86,7 +86,7 @@ ExecutionState::ExecutionState(KFunction *kf, Prefix* prefix)
     ptreeNode(0) {
 
 	condManager.setMutexManager(&mutexManager);
-	threadScheduler = new GuidedThreadScheduler(this, ThreadScheduler::Random, prefix);
+	threadScheduler = new GuidedThreadScheduler(this, ThreadScheduler::FIFS, prefix);
 	Thread* thread = new Thread(getNextThreadId(), NULL, kf, &addressSpace);
 	currentStack = thread->stack;
 	threadList.addThread(thread);
@@ -366,11 +366,14 @@ Thread* ExecutionState::findThreadById(unsigned threadId) {
 }
 
 Thread* ExecutionState::getCurrentThread() {
+//	Thread* CurrentThread;
 	if (!threadScheduler->isSchedulerEmpty()) {
 		currentThread = threadScheduler->selectCurrentItem();
 	} else {
 		currentThread = NULL;
 	}
+//	llvm::errs() << "currentThread : " << currentThread->threadId << "\n";
+//	llvm::errs() << "threadScheduler->selectCurrentItem() : " << CurrentThread->threadId << "\n";
 	return currentThread;
 }
 

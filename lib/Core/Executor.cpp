@@ -2527,7 +2527,7 @@ void Executor::bindModuleConstants() {
 }
 
 void Executor::checkMemoryUsage() {
-	if (!MaxMemory)
+	if (MaxMemory)
 		return;
 	if ((stats::instructions & 0xFFFF) == 0) {
 		// We need to avoid calling GetTotalMallocUsage() often because it
@@ -2694,6 +2694,7 @@ void Executor::run(ExecutionState &initialState) {
 			listenerService->executionFailed(state, state.currentThread->pc);
 			llvm::errs() << "thread unable to run, Id: " << thread->threadId << " state: " << thread->threadState << "\n";
 			terminateState(state);
+			updateStates(&state);
 			break;
 			//assert(0 && "thread are unable to execute!");
 		}

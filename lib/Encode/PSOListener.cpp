@@ -345,6 +345,7 @@ namespace klee {
 							const MemoryObject *mo = op.first;
 							if (executor->isGlobalMO(mo)) {
 								item->isGlobal = true;
+								state.isGlobal = true;
 							}
 							string varName = createVarName(mo->id, key, item->isGlobal);
 							string varFullName;
@@ -403,6 +404,7 @@ namespace klee {
 						const MemoryObject *mo = op.first;
 						if (executor->isGlobalMO(mo)) {
 							item->isGlobal = true;
+							state.isGlobal = true;
 						}
 						string varName = createVarName(mo->id, key, item->isGlobal);
 						string varFullName;

@@ -18,6 +18,10 @@ namespace klee {
 	}
 
 	BitcodeListener::~BitcodeListener() {
-
+		for (std::map<unsigned, StackType*>::iterator it = stack.begin(), ie = stack.end(); it != ie; it++) {
+			if (it->second) {
+				delete it->second;
+			}
+		}
 	}
 }

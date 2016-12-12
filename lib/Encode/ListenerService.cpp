@@ -158,7 +158,7 @@ namespace klee {
 
 	void ListenerService::beforeExecuteInstruction(Executor* executor, ExecutionState &state, KInstruction *ki) {
 
-#if !DEBUG_RUNTIME
+#if DEBUG_RUNTIME
 		llvm::errs() << "thread id : " << state.currentThread->threadId << "  ";
 		ki->inst->dump();
 //		llvm::errs() << " before : " << "prefix : " << executor->prefix->isFinished() << "\n";
@@ -613,15 +613,15 @@ namespace klee {
 #endif
 
 		if (executor->execStatus != Executor::SUCCESS) {
-			llvm::errs() << "######################执行有错误,放弃本次执行##############\n";
+			llvm::errs() << "\n######################执行有错误,放弃本次执行##############\n";
 //			executor->isFinished = true;
 			executor->execStatus = Executor::SUCCESS;
 //			return;
 		} else if (!rdManager.isCurrentTraceUntested()) {
 			rdManager.getCurrentTrace()->traceType = Trace::REDUNDANT;
-			llvm::errs() << "######################本条路径为旧路径####################\n";
+			llvm::errs() << "\n######################本条路径为旧路径####################\n";
 		} else {
-			llvm::errs() << "######################本条路径为新路径####################\n";
+			llvm::errs() << "\n######################本条路径为新路径####################\n";
 			rdManager.getCurrentTrace()->traceType = Trace::UNIQUE;
 //			Trace* trace = rdManager.getCurrentTrace();
 
@@ -678,12 +678,13 @@ namespace klee {
 
 		for (std::vector<BitcodeListener*>::iterator bit = bitcodeListeners.begin(), bie = bitcodeListeners.end(); bit != bie; ++bit) {
 //			delete *bit;
+//			(*bit)->~BitcodeListener();
 			bitcodeListeners.pop_back();
 		}
 
-		if (executor->executionNum >= 70) {
-			executor->isFinished = true;
-		}
+//		if (executor->executionNum >= 70) {
+//			executor->isFinished = true;
+//		}
 
 	}
 
@@ -694,10 +695,18 @@ namespace klee {
 		Thread* thread = state.getCurrentThread();
 		Thread* SwitchThread = state.getCurrentThread();
 		std::list<Thread*> queue = state.getQueue();
+		KInstruction *ki = thread->pc;
+
+//		llvm::errs() << "ContextSwitch thread id : " << thread->threadId << "  ";
+//		ki->inst->dump();
+
+//		llvm::errs() << "state.ContextSwitch : " << state.ContextSwitch << "\n";
+//		llvm::errs() << "(!(executor->prefix && !executor->prefix->isFinished())) : " << (!(executor->prefix && !executor->prefix->isFinished())) << "\n";
+//		llvm::errs() << "state.isGlobal : " << state.isGlobal << "\n";
 
 		switch (thread->threadState) {
 			case Thread::RUNNABLE: {
-				if (state.ContextSwitch < 2 && !(executor->prefix && !executor->prefix->isFinished()) && state.isGlobal) {
+				if (state.ContextSwitch < 2 && (!(executor->prefix && !executor->prefix->isFinished())) && state.isGlobal) {
 					std::list<Thread*>::iterator it = queue.begin();
 					std::list<Thread*>::iterator ie = queue.end();
 					if (queue.size() > 1) {
@@ -705,6 +714,7 @@ namespace klee {
 						for (; it != ie; it++) {
 							SwitchThread = *it;
 							KInstruction *ki = SwitchThread->pc;
+//							llvm::errs() << "RUNNABLE SwitchThread id : " << SwitchThread->threadId;
 							Event* item = trace->createEvent(SwitchThread->threadId, ki, Event::NORMAL);
 							path.push_back(item);
 							stringstream ss;
@@ -713,7 +723,6 @@ namespace klee {
 //							llvm::errs() << "rdManager.addScheduleSet(prefix) state.ContextSwitch + 1　:　" << ss.str() << "\n";
 							rdManager.addScheduleSet(prefix);
 							path.pop_back();
-							state.isGlobal = false;
 						}
 					}
 				}
@@ -729,6 +738,7 @@ namespace klee {
 						it++;
 						for (; it != ie; it++) {
 							SwitchThread = *it;
+//							llvm::errs() << "MUTEX_BLOCKED SwitchThread id : " << SwitchThread->threadId << "\n";
 							KInstruction *ki = SwitchThread->pc;
 							Event* item = trace->createEvent(SwitchThread->threadId, ki, Event::NORMAL);
 							path.push_back(item);
@@ -738,7 +748,6 @@ namespace klee {
 //							llvm::errs() << "rdManager.addScheduleSet(prefix) state.ContextSwitch　:　" << ss.str() << "\n";
 							rdManager.addScheduleSet(prefix);
 							path.pop_back();
-							state.isGlobal = false;
 						}
 					}
 				}
@@ -748,6 +757,9 @@ namespace klee {
 			default: {
 				break;
 			}
+		}
+		if(state.isGlobal){
+			state.isGlobal = false;
 		}
 	}
 
